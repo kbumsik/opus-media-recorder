@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Opus MediaRecorder Example</title>
+  <style>
+    html, body {
+      font-size: 40px;
+      text-align: center;
+    }
+    .title {
+      font-size: 40px;
+    }
+    .content {
+      font-size: 16px;
+    }
+    div.content {
+      border: 4px solid;
+      border-radius: 20px;
+      padding: 10px 10px 10px 10px;
+      margin: 10px 10px 10px 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="title">
+    Opus MediaRecorder Example
+  </div>
+
+  <!-- Recording test1 -->
+  <div class="content">
+    <button id="buttonStart">start</button>
+    <button id="buttonStop">stop</button>
+    <audio id="player" controls></audio>
+    <script src="bundle.js"></script>
+    <script>
+    var handleSuccess = function (stream) {
+      // Create Audio Context
+      let context = new AudioContext();
+      let source = context.createMediaStreamSource(stream);
+      let processor = context.createScriptProcessor(1024, 1, 1);
+      source.connect(processor);
+      processor.connect(context.destination);
+      processor.onaudioprocess = function (e) {
+        // Do something with the data, i.e Convert this to WAV
+        // console.log(e.inputBuffer);
+      };
+      let recorder = new MediaRecorder(stream);
+      console.log(recorder.videoBitsPerSecond);
+      console.log(recorder.audioBitsPerSecond);
+
+      // Start recording
+      let chunks = [];
+      recorder.ondataavailable = function (e) {
+        chunks.push(e.data);
+      };
+      recorder.start();
+      let buttonStop = document.querySelector('#buttonStop');
+      buttonStop.onclick = () => {
+        recorder.stop();
+        stream.getTracks()[0].stop();
+      };
+      recorder.onstop = function (e) {
+        console.log('data available after MediaRecorder.stop() called.');
+        let blob = new Blob(chunks, {'type': 'audio/ogg;codecs=opus'});
+        chunks = [];
+        let audioURL = URL.createObjectURL(blob);
+        let player = document.querySelector('#player');
+        player.src = audioURL;
+        console.log('recorder stopped');
+      };
+    };
+    
+    var buttonStart = document.querySelector('#buttonStart');
+    buttonStart.onclick = () => {
+      navigator.mediaDevices.getUserMedia({audio: true, video: false})
+        .then(handleSuccess);
+    };
+    
+    // Check compability
+    if (window.MediaRecorder === undefined) {
+      console.error('MediaRecorder not supported, boo');
+      alert('MediaRecorder not supported, boo');
+    } else {
+      var contentTypes = [
+        'audio/wave',
+        'audio/wav',
+        'audio/webm',
+        'audio/webm;codecs=opus',
+        'audio/ogg',
+        'audio/ogg;codecs=opus',
+        'audio/opus'];
+      contentTypes.forEach(contentType => {
+        console.log(contentType + ' is ' +
+          (MediaRecorder.isTypeSupported(contentType)
+            ? 'supported' : 'NOT supported '));
+      });
+    };
+    </script>
+  </div>
+
+</body>
+
+</html>
