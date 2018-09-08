@@ -31,47 +31,83 @@
   <!-- Recording test1 -->
   <div class="content">
     <button id="buttonStart">start</button>
+    <button id="buttonPause">pause</button>
+    <button id="buttonResume">resume</button>
     <button id="buttonStop">stop</button>
     <audio id="player" controls></audio>
+    <a id="link">link</a>
     <script src="bundle.js"></script>
     <script>
     var handleSuccess = function (stream) {
-      // Create Audio Context
-      let context = new AudioContext();
-      let source = context.createMediaStreamSource(stream);
-      let processor = context.createScriptProcessor(1024, 1, 1);
-      source.connect(processor);
-      processor.connect(context.destination);
-      processor.onaudioprocess = function (e) {
-        // Do something with the data, i.e Convert this to WAV
-        // console.log(e.inputBuffer);
-      };
-      let recorder = new MediaRecorder(stream);
+      // print stream information (for debugging)
+      for (const track of stream.getAudioTracks()) {
+        console.log('Track Information:');
+        for (const key in track) {
+          if (typeof track[key] !== 'function') {
+            console.log(`\t${key}: ${track[key]}`);
+          }
+        }
+        console.log('Track Settings:');
+        let settings = track.getSettings();
+        for (const key in settings) {
+          if (typeof settings[key] !== 'function') {
+            console.log(`\t${key}: ${settings[key]}`);
+          }
+        }
+      }
+
+      // Create recorder object
+      if (typeof window.recorder !== 'undefined') {
+        console.log('recorder already exists');
+        return;
+      }
+      window.recorder = new MediaRecorder(stream);
+      let { recorder } = window;
       console.log(recorder.videoBitsPerSecond);
       console.log(recorder.audioBitsPerSecond);
 
       // Start recording
       let chunks = [];
+      recorder.start(3000);
+
+      // Button Event Handlers
+      let buttonPause = document.querySelector('#buttonPause');
+      buttonPause.onclick = () => recorder.pause();
+
+      let buttonResume = document.querySelector('#buttonResume');
+      buttonResume.onclick = () => recorder.resume();
+
+      let buttonStop = document.querySelector('#buttonStop');
+      buttonStop.onclick = () => recorder.stop();
+
+      // Recorder Event Handlers
       recorder.ondataavailable = function (e) {
         chunks.push(e.data);
+        console.log('recorder data available');
       };
-      recorder.start();
-      let buttonStop = document.querySelector('#buttonStop');
-      buttonStop.onclick = () => {
-        recorder.stop();
-        stream.getTracks()[0].stop();
+
+      recorder.onpause = function (e) {
+        console.log('recorder paused');
       };
+
+      recorder.onresume = function (e) {
+        console.log('recrder resumed');
+      };
+
       recorder.onstop = function (e) {
         console.log('data available after MediaRecorder.stop() called.');
-        let blob = new Blob(chunks, {'type': 'audio/ogg;codecs=opus'});
+        let blob = new Blob(chunks, {'type': 'audio/wave'});
         chunks = [];
         let audioURL = URL.createObjectURL(blob);
         let player = document.querySelector('#player');
         player.src = audioURL;
+        let link = document.querySelector('#link');
+        link.href = audioURL;
         console.log('recorder stopped');
       };
     };
     
+    // Start Button
     var buttonStart = document.querySelector('#buttonStart');
     buttonStart.onclick = () => {
       navigator.mediaDevices.getUserMedia({audio: true, video: false})

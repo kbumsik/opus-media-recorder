@@ -2,7 +2,9 @@
 
 import {EventTarget, defineEventAttribute} from 'event-target-shim';
 
-// var AudioContext = global.AudioContext || global.webkitAudioContext;
+let AudioContext = global.AudioContext || global.webkitAudioContext;
+let BUFFER_SIZE = 4096;
+let BYTES_PER_SAMPLE = 2; // This means 16-bit wav file.
 
 /**
  * Reference: https://w3c.github.io/mediacapture-record/#mediarecorder-api
@@ -20,11 +22,28 @@ class MediaRecorder extends EventTarget {
    */
   constructor (stream, options = {}) {
     super();
+    // Attributes for the specification conformance. These have their own getters.
     this._stream = stream;
-    this._mimeType = 'audio/wav';
+    this._mimeType = 'audio/wave';
     this._state = 'inactive';
     this._videoBitsPerSecond = undefined;
     this._audioBitsPerSecond = undefined;
+
+    this.context = new AudioContext();
+
+    // Get channel count and sampling rate
+    // channelCount: https://www.w3.org/TR/mediacapture-streams/#media-track-settings
+    // sampleRate: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/sampleRate
+    let tracks = this.stream.getAudioTracks();
+    this.channelCount = tracks[0].getSettings().channelCount;
+    this.sampleRate = this.context.sampleRate;
+
+    // Create source and processor
+    this.source = this.context.createMediaStreamSource(this.stream);
+    this.processor = this.context.createScriptProcessor(BUFFER_SIZE, this.channelCount, 0);
+
+    /** @type {TypedArray[]} */
+    this.encodedBuffer = [];
   }
 
   /**
@@ -93,7 +112,61 @@ class MediaRecorder extends EventTarget {
    *          the largest long value.
    */
   start (timeslice = Number.MAX_SAFE_INTEGER) {
-    return undefined;
+    if (this.state !== 'inactive') {
+      return;
+    }
+    this._state = 'recording';
+    timeslice /= 1000; // Convert milliseconds to seconds
+    this.previousTime = 0;
+    this.elapsedTime = 0;
+
+    // WAV Encoding script
+    this.processor.onaudioprocess = (e) => {
+      let { inputBuffer, playbackTime } = e;
+      let { length } = inputBuffer; // also sampleRate, duration
+
+      /** @type {Float32Array} */
+      let channelData = [];
+      // Channel 0 is left and Channel 1 is
+      for (let i = 0; i < this.channelCount; i++) {
+        channelData[i] = inputBuffer.getChannelData(i);
+      }
+
+      // Convert Float32 to Int16
+      let data = new Uint8Array(length * BYTES_PER_SAMPLE * this.channelCount);
+      let view = new DataView(data.buffer);
+      for (let ch = 0; ch < this.channelCount; ch++) {
+        for (let i = 0; i < length; i++) {
+          const offset = (i * this.channelCount + ch) * BYTES_PER_SAMPLE;
+          // Clamp value
+          let sample = (channelData[ch][i] * 0x7FFF) | 0;
+          if (sample > 0x7FFF) {
+            sample = 0x7FFF | 0;
+          } else if (sample < -0x8000) {
+            sample = -0x8000 | 0;
+          }
+          // Then store
+          view.setInt16(offset, sample | 0, true);
+        }
+      }
+
+      // Encoding completed
+      this.encodedBuffer.push(data);
+
+      // Calculate time
+      let diffTime = playbackTime - this.previousTime;
+      console.log(diffTime);
+      this.elapsedTime += diffTime;
+      if (this.elapsedTime >= timeslice) {
+        this.requestData();
+        this.elapsedTime = 0;
+      }
+      this.previousTime = playbackTime;
+    };
+
+    // Start streaming data
+    this.source.connect(this.processor);
+    this.processor.connect(this.context.destination);
   }
 
   /**
@@ -101,21 +174,53 @@ class MediaRecorder extends EventTarget {
    * the final Blob of saved data is fired. No more recording occurs.
    */
   stop () {
-    return undefined;
+    if (this.state !== 'recording') {
+      return;
+    }
+    this._state = 'inactive';
+
+    // Stop stream first
+    this.source.disconnect();
+    this.processor.disconnect();
+
+    this.requestData();
+
+    let event = new global.Event('stop');
+    this.dispatchEvent(event);
   }
 
   /**
    * Pauses the recording of media.
    */
   pause () {
-    return undefined;
+    if (this.state !== 'recording') {
+      return;
+    }
+    this._state = 'paused';
+
+    // Stop stream first
+    this.source.disconnect();
+    this.processor.disconnect();
+
+    let event = new global.Event('pause');
+    this.dispatchEvent(event);
   }
 
   /**
    * Resumes recording of media after having been paused.
    */
   resume () {
-    return undefined;
+    if (this.state !== 'paused') {
+      return;
+    }
+    this._state = 'recording';
+
+    // Start streaming data
+    this.source.connect(this.processor);
+    this.processor.connect(this.context.destination);
+
+    let event = new global.Event('resume');
+    this.dispatchEvent(event);
   }
 
   /**
@@ -124,7 +229,46 @@ class MediaRecorder extends EventTarget {
    * recording continues, but in a new Blob.
    */
   requestData () {
-    return undefined;
+    // Create header data
+    let dataLength = this.encodedBuffer.reduce((acc, cur) => acc + cur.length, 0);
+    let header = new Uint8Array(44);
+    let view = new DataView(header.buffer);
+    // RIFF identifier 'RIFF'
+    view.setUint32(0, 0x52494646, false);
+    // file length minus RIFF identifier length and file description length
+    view.setUint32(4, 36 + dataLength, true);
+    // RIFF type 'WAVE'
+    view.setUint32(8, 0x57415645, false);
+    // format chunk identifier 'fmt '
+    view.setUint32(12, 0x666d7420, false);
+    // format chunk length
+    view.setUint32(16, 16, true);
+    // sample format (raw)
+    view.setUint16(20, 1, true);
+    // channel count
+    view.setUint16(22, this.channelCount, true);
+    // sample rate
+    view.setUint32(24, this.sampleRate, true);
+    // byte rate (sample rate * block align)
+    view.setUint32(28, this.sampleRate * BYTES_PER_SAMPLE * this.channelCount, true);
+    // block align (channel count * bytes per sample)
+    view.setUint16(32, BYTES_PER_SAMPLE * this.channelCount, true);
+    // bits per sample
+    view.setUint16(34, 8 * BYTES_PER_SAMPLE, true);
+    // data chunk identifier 'data'
+    view.setUint32(36, 0x64617461, false);
+    // data chunk length
+    view.setUint32(40, dataLength, true);
+
+    // Concat two data: [...header, ...encoded]
+    let data = [header, ...this.encodedBuffer];
+    data = new Blob(data, {'type': this._mimeType});
+    this.encodedBuffer = [];
+
+    // Invoke the callback
+    let event = new global.Event('dataavailable');
+    event.data = data;
+    this.dispatchEvent(event);
   }
 
   /**
@@ -144,14 +288,14 @@ class MediaRecorder extends EventTarget {
 
 // EventHandler attributes
 [
-  'onstart', // Called to handle the {@link MediaRecorder#start} event.
-  'onstop', // Called to handle the stop event.
-  'ondataavailable', /* Called to handle the dataavailable event. The Blob of
+  'start', // Called to handle the {@link MediaRecorder#start} event.
+  'stop', // Called to handle the stop event.
+  'dataavailable', /* Called to handle the dataavailable event. The Blob of
                         recorded data is contained in this event and can be
                         accessed via its data attribute. */
-  'onpause', // Called to handle the pause event.
-  'onresume', // Called to handle the resume event.
-  'onerror' // Called to handle a MediaRecorderErrorEvent.
+  'pause', // Called to handle the pause event.
+  'resume', // Called to handle the resume event.
+  'error' // Called to handle a MediaRecorderErrorEvent.
 ].forEach(name => defineEventAttribute(MediaRecorder.prototype, name));
 
 export default MediaRecorder;
