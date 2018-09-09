@@ -11,6 +11,9 @@ module.exports = {
     "linebreak-style": ["error", "unix"],
     "semi": ["error", "always"]
   },
+  "env": {
+    "browser": true
+  },
   "overrides": [
     {
       "files": [ "*.config.js"],

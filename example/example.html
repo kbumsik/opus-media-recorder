@@ -36,7 +36,7 @@
     <button id="buttonStop">stop</button>
     <audio id="player" controls></audio>
     <a id="link">link</a>
-    <script src="bundle.js"></script>
+    <script src="MediaRecorder.js"></script>
     <script>
     var handleSuccess = function (stream) {
       // print stream information (for debugging)
@@ -56,9 +56,11 @@
         }
       }
 
+      let milliSeconds = 15000;
       // Create recorder object
       if (typeof window.recorder !== 'undefined') {
         console.log('recorder already exists');
+        window.recorder.start(milliSeconds);
         return;
       }
       window.recorder = new MediaRecorder(stream);
@@ -68,7 +70,7 @@
 
       // Start recording
       let chunks = [];
-      recorder.start(3000);
+      recorder.start(milliSeconds);
 
       // Button Event Handlers
       let buttonPause = document.querySelector('#buttonPause');

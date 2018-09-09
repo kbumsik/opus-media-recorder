@@ -4,7 +4,7 @@ import {EventTarget, defineEventAttribute} from 'event-target-shim';
 
 let AudioContext = global.AudioContext || global.webkitAudioContext;
 let BUFFER_SIZE = 4096;
-let BYTES_PER_SAMPLE = 2; // This means 16-bit wav file.
+let BYTES_PER_SAMPLE = Int16Array.BYTES_PER_ELEMENT; // This means 16-bit wav file.
 
 /**
  * Reference: https://w3c.github.io/mediacapture-record/#mediarecorder-api
@@ -40,10 +40,10 @@ class MediaRecorder extends EventTarget {
 
     // Create source and processor
     this.source = this.context.createMediaStreamSource(this.stream);
-    this.processor = this.context.createScriptProcessor(BUFFER_SIZE, this.channelCount, 0);
+    this.processor = this.context.createScriptProcessor(BUFFER_SIZE, this.channelCount, this.channelCount);
 
-    /** @type {TypedArray[]} */
-    this.encodedBuffer = [];
+    this.encodedBuffers = []; /** @type {ArrayBuffer[]} */
+    this.encoderWorker = undefined; /** @type {Worker} */
   }
 
   /**
@@ -117,51 +117,44 @@ class MediaRecorder extends EventTarget {
     }
     this._state = 'recording';
     timeslice /= 1000; // Convert milliseconds to seconds
-    this.previousTime = 0;
     this.elapsedTime = 0;
+
+    // Create worker
+    this.encoderWorker = new Worker('WaveWorker.js');
 
     // WAV Encoding script
     this.processor.onaudioprocess = (e) => {
-      let { inputBuffer, playbackTime } = e;
-      let { length } = inputBuffer; // also sampleRate, duration
+      const { inputBuffer, playbackTime } = e; // eslint-disable-line
+      const { sampleRate, length, duration, numberOfChannels } = inputBuffer; // eslint-disable-line
 
-      /** @type {Float32Array} */
-      let channelData = [];
-      // Channel 0 is left and Channel 1 is
-      for (let i = 0; i < this.channelCount; i++) {
-        channelData[i] = inputBuffer.getChannelData(i);
+      // Create channel buffers to pass to the worker
+      const channelArrays = new Array(numberOfChannels);
+      for (let i = 0; i < numberOfChannels; i++) {
+        channelArrays[i] = inputBuffer.getChannelData(i);
       }
 
-      // Convert Float32 to Int16
-      let data = new Uint8Array(length * BYTES_PER_SAMPLE * this.channelCount);
-      let view = new DataView(data.buffer);
-      for (let ch = 0; ch < this.channelCount; ch++) {
-        for (let i = 0; i < length; i++) {
-          const offset = (i * this.channelCount + ch) * BYTES_PER_SAMPLE;
-          // Clamp value
-          let sample = (channelData[ch][i] * 0x7FFF) | 0;
-          if (sample > 0x7FFF) {
-            sample = 0x7FFF | 0;
-          } else if (sample < -0x8000) {
-            sample = -0x8000 | 0;
+      // Pass data to the worker
+      const audioBufferProperty = { sampleRate, length, duration, numberOfChannels };
+      const dataToPost = { command: 'encode', channelArrays, audioBufferProperty };
+      this.encoderWorker.postMessage(dataToPost, channelArrays.map(a => a.buffer));
+    };
+
+    // Callback when encoding completed
+    this.encoderWorker.onmessage = (e) => {
+      const { command, buffer, duration } = e.data;
+      switch (command) {
+        case 'encoded':
+          this.encodedBuffers.push(buffer);
+          // Calculate time
+          this.elapsedTime += duration;
+          if (this.elapsedTime >= timeslice) {
+            this.requestData();
+            this.elapsedTime = 0;
           }
-          // Then store
-          view.setInt16(offset, sample | 0, true);
-        }
+          break;
+        default:
+          break; // Ignore
       }
-
-      // Encoding completed
-      this.encodedBuffer.push(data);
-
-      // Calculate time
-      let diffTime = playbackTime - this.previousTime;
-      console.log(diffTime);
-      this.elapsedTime += diffTime;
-      if (this.elapsedTime >= timeslice) {
-        this.requestData();
-        this.elapsedTime = 0;
-      }
-      this.previousTime = playbackTime;
     };
 
     // Start streaming data
@@ -184,6 +177,7 @@ class MediaRecorder extends EventTarget {
     this.processor.disconnect();
 
     this.requestData();
+    this.encoderWorker.terminate();
 
     let event = new global.Event('stop');
     this.dispatchEvent(event);
@@ -230,9 +224,9 @@ class MediaRecorder extends EventTarget {
    */
   requestData () {
     // Create header data
-    let dataLength = this.encodedBuffer.reduce((acc, cur) => acc + cur.length, 0);
-    let header = new Uint8Array(44);
-    let view = new DataView(header.buffer);
+    let dataLength = this.encodedBuffers.reduce((acc, cur) => acc + cur.byteLength, 0);
+    let header = new ArrayBuffer(44);
+    let view = new DataView(header);
     // RIFF identifier 'RIFF'
     view.setUint32(0, 0x52494646, false);
     // file length minus RIFF identifier length and file description length
@@ -261,9 +255,9 @@ class MediaRecorder extends EventTarget {
     view.setUint32(40, dataLength, true);
 
     // Concat two data: [...header, ...encoded]
-    let data = [header, ...this.encodedBuffer];
+    let data = [header, ...this.encodedBuffers];
     data = new Blob(data, {'type': this._mimeType});
-    this.encodedBuffer = [];
+    this.encodedBuffers = [];
 
     // Invoke the callback
     let event = new global.Event('dataavailable');
@@ -286,7 +280,8 @@ class MediaRecorder extends EventTarget {
   }
 }
 
-// EventHandler attributes
+// EventHandler attributes.
+// This code is a non-standard EventTarget but required by event-target-shim.
 [
   'start', // Called to handle the {@link MediaRecorder#start} event.
   'stop', // Called to handle the stop event.

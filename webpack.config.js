@@ -1,14 +1,14 @@
-module.exports = {
+var config = {
   "mode": "development",
   "entry": [
-    "./src/MediaRecorder.js"
+    "./src/index.js"
   ],
   "output": {
-    "library": "MediaRecorder",
+    "library": "[name]",
     "libraryTarget": "umd",
     "libraryExport": "default",
     "path": `${__dirname}/build`,
-    "filename": "bundle.js"
+    "filename": "[name].js"
   },
   "module": {
     "rules": [
@@ -37,3 +37,30 @@ module.exports = {
     https: true
   }
 };
+
+var MediaRecorder = Object.assign({}, config, {
+  "entry": {
+    MediaRecorder: ["./src/MediaRecorder.js"]
+  },
+  "output": {
+    "library": "[name]",
+    "libraryTarget": "umd",
+    "libraryExport": "default",
+    "path": `${__dirname}/build`,
+    "filename": "[name].js"
+  }
+});
+
+var WaveWorker = Object.assign({}, config, {
+  "entry": {
+    WaveWorker: ["./src/WaveWorker.js"]
+  },
+  "output": {
+    "path": `${__dirname}/build`,
+    "filename": "WaveWorker.js"
+  }
+});
+
+module.exports = [
+  MediaRecorder, WaveWorker
+];
