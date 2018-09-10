@@ -1,3 +1,6 @@
 [submodule "lib/opus"]
 	path = lib/opus
 	url = https://git.xiph.org/opus.git
+[submodule "lib/ogg"]
+	path = lib/ogg
+	url = https://git.xiph.org/ogg.git
