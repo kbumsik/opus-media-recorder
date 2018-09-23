@@ -4,3 +4,6 @@
 [submodule "lib/ogg"]
 	path = lib/ogg
 	url = https://git.xiph.org/ogg.git
+[submodule "lib/speexdsp"]
+	path = lib/speexdsp
+	url = https://git.xiph.org/speexdsp.git
