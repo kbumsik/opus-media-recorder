@@ -113,9 +113,13 @@ class MediaRecorder extends EventTarget {
    */
   start (timeslice = Number.MAX_SAFE_INTEGER) {
     if (this.state !== 'inactive') {
+      // Throw DOM_INVALID_STATE_ERR
       return;
     }
-    this._state = 'recording';
+    if (timeslice < 0) {
+      // Throw ERR_INVALID_ARG
+      return;
+    }
     timeslice /= 1000; // Convert milliseconds to seconds
     this.elapsedTime = 0;
 
@@ -158,6 +162,7 @@ class MediaRecorder extends EventTarget {
     };
 
     // Start streaming data
+    this._state = 'recording';
     this.source.connect(this.processor);
     this.processor.connect(this.context.destination);
   }
@@ -167,7 +172,8 @@ class MediaRecorder extends EventTarget {
    * the final Blob of saved data is fired. No more recording occurs.
    */
   stop () {
-    if (this.state !== 'recording') {
+    if (this.state === 'inactive') {
+      // Throw DOM_INVALID_STATE_ERR
       return;
     }
     this._state = 'inactive';
@@ -188,9 +194,9 @@ class MediaRecorder extends EventTarget {
    */
   pause () {
     if (this.state !== 'recording') {
+      // Throw DOM_INVALID_STATE_ERR
       return;
     }
-    this._state = 'paused';
 
     // Stop stream first
     this.source.disconnect();
@@ -198,6 +204,7 @@ class MediaRecorder extends EventTarget {
 
     let event = new global.Event('pause');
     this.dispatchEvent(event);
+    this._state = 'paused';
   }
 
   /**
@@ -205,9 +212,9 @@ class MediaRecorder extends EventTarget {
    */
   resume () {
     if (this.state !== 'paused') {
+      // Throw DOM_INVALID_STATE_ERR
       return;
     }
-    this._state = 'recording';
 
     // Start streaming data
     this.source.connect(this.processor);
@@ -215,6 +222,7 @@ class MediaRecorder extends EventTarget {
 
     let event = new global.Event('resume');
     this.dispatchEvent(event);
+    this._state = 'recording';
   }
 
   /**
@@ -223,6 +231,11 @@ class MediaRecorder extends EventTarget {
    * recording continues, but in a new Blob.
    */
   requestData () {
+    if (this.state === 'inactive') {
+      // Throw DOM_INVALID_STATE_ERR
+      return;
+    }
+
     // Create header data
     let dataLength = this.encodedBuffers.reduce((acc, cur) => acc + cur.byteLength, 0);
     let header = new ArrayBuffer(44);
