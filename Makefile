@@ -1,12 +1,11 @@
 LIB_DIR = ./lib
 
-export OPUS_OBJ = $(LIB_DIR)/opus/.libs/libopus.a
-export OGG_OBJ = $(LIB_DIR)/src/.libs/libogg.a
+.PHONY: all build-lib clean
 
-all: $(OPUS_OBJ) $(OGG_OBJ)
+all: build-lib
 
-$(OPUS_OBJ) $(OGG_OBJ):
-	make -C $(LIB_DIR) $@
+build-lib:
+	make -C $(LIB_DIR) all
 
 clean:
 	make -C $(LIB_DIR) clean
