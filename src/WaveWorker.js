@@ -11,7 +11,7 @@ class WaveEncoder {
    *                                         except methods
    * @return {ArrayBuffer} - Generated ArrayBuffer that contains encoded result.
    */
-  encode (channelArrays, audioBufferProperty) {
+  encode (channelBuffers, audioBufferProperty) {
     const { sampleRate, length, duration, numberOfChannels } = audioBufferProperty; // eslint-disable-line
 
     const encodedBuffer = new ArrayBuffer(length * BYTES_PER_SAMPLE * numberOfChannels);
@@ -22,7 +22,7 @@ class WaveEncoder {
       for (let i = 0; i < length; i++) {
         const offset = (i * numberOfChannels + ch) * BYTES_PER_SAMPLE;
         // Clamp value
-        let sample = (channelArrays[ch][i] * 0x7FFF) | 0;
+        let sample = (channelBuffers[ch][i] * 0x7FFF) | 0;
         if (sample > 0x7FFF) {
           sample = 0x7FFF | 0;
         } else if (sample < -0x8000) {
@@ -39,10 +39,10 @@ class WaveEncoder {
 const encoder = new WaveEncoder();
 
 self.onmessage = (e) => {
-  const { command, channelArrays, audioBufferProperty } = e.data;
+  const { command, channelBuffers, audioBufferProperty } = e.data;
   switch (command) {
     case 'encode':
-      const encoded = encoder.encode(channelArrays, audioBufferProperty);
+      const encoded = encoder.encode(channelBuffers, audioBufferProperty);
       self.postMessage(
         {
           command: 'encoded',

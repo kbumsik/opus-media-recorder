@@ -1,10 +1,9 @@
 'use strict';
-
 import {EventTarget, defineEventAttribute} from 'event-target-shim';
+import WaveEncoder from './WaveEncoder.js';
 
 let AudioContext = global.AudioContext || global.webkitAudioContext;
 let BUFFER_SIZE = 4096;
-let BYTES_PER_SAMPLE = Int16Array.BYTES_PER_ELEMENT; // This means 16-bit wav file.
 
 /**
  * Reference: https://w3c.github.io/mediacapture-record/#mediarecorder-api
@@ -26,8 +25,11 @@ class MediaRecorder extends EventTarget {
     this._stream = stream;
     this._mimeType = 'audio/wave';
     this._state = 'inactive';
-    this._videoBitsPerSecond = undefined;
     this._audioBitsPerSecond = undefined;
+    if (!MediaRecorder.isTypeSupported(this._mimeType)) {
+      // TODO: Throw what?
+      return;
+    }
 
     this.context = new AudioContext();
 
@@ -38,12 +40,19 @@ class MediaRecorder extends EventTarget {
     this.channelCount = tracks[0].getSettings().channelCount;
     this.sampleRate = this.context.sampleRate;
 
-    // Create source and processor
+    /** @type {MediaStreamAudioSourceNode} */
     this.source = this.context.createMediaStreamSource(this.stream);
+    /** @type {ScriptProcessorNode} */
     this.processor = this.context.createScriptProcessor(BUFFER_SIZE, this.channelCount, this.channelCount);
 
-    this.encodedBuffers = []; /** @type {ArrayBuffer[]} */
-    this.encoderWorker = undefined; /** @type {Worker} */
+    switch (this._mimeType.replace(/\s/g, '')) {
+      case 'audio/wave':
+        this.encoder = new WaveEncoder(this, this.processor, this.sampleRate, this.channelCount);
+        break;
+      default:
+        // Should be considered error
+        break;
+    }
   }
 
   /**
@@ -83,7 +92,8 @@ class MediaRecorder extends EventTarget {
    * @return {number|undefined}
    */
   get videoBitsPerSecond () {
-    return this._videoBitsPerSecond;
+    // Video encoding is not supported
+    return undefined;
   }
 
   /**
@@ -121,47 +131,9 @@ class MediaRecorder extends EventTarget {
       return;
     }
     timeslice /= 1000; // Convert milliseconds to seconds
-    this.elapsedTime = 0;
-
-    // Create worker
-    this.encoderWorker = new Worker('WaveWorker.js');
-
-    // WAV Encoding script
-    this.processor.onaudioprocess = (e) => {
-      const { inputBuffer, playbackTime } = e; // eslint-disable-line
-      const { sampleRate, length, duration, numberOfChannels } = inputBuffer; // eslint-disable-line
-
-      // Create channel buffers to pass to the worker
-      const channelArrays = new Array(numberOfChannels);
-      for (let i = 0; i < numberOfChannels; i++) {
-        channelArrays[i] = inputBuffer.getChannelData(i);
-      }
-
-      // Pass data to the worker
-      const audioBufferProperty = { sampleRate, length, duration, numberOfChannels };
-      const dataToPost = { command: 'encode', channelArrays, audioBufferProperty };
-      this.encoderWorker.postMessage(dataToPost, channelArrays.map(a => a.buffer));
-    };
-
-    // Callback when encoding completed
-    this.encoderWorker.onmessage = (e) => {
-      const { command, buffer, duration } = e.data;
-      switch (command) {
-        case 'encoded':
-          this.encodedBuffers.push(buffer);
-          // Calculate time
-          this.elapsedTime += duration;
-          if (this.elapsedTime >= timeslice) {
-            this.requestData();
-            this.elapsedTime = 0;
-          }
-          break;
-        default:
-          break; // Ignore
-      }
-    };
 
     // Start streaming data
+    this.encoder.start(timeslice);
     this._state = 'recording';
     this.source.connect(this.processor);
     this.processor.connect(this.context.destination);
@@ -176,17 +148,18 @@ class MediaRecorder extends EventTarget {
       // Throw DOM_INVALID_STATE_ERR
       return;
     }
-    this._state = 'inactive';
 
     // Stop stream first
     this.source.disconnect();
     this.processor.disconnect();
 
     this.requestData();
-    this.encoderWorker.terminate();
+    this.encoder.stop();
 
     let event = new global.Event('stop');
     this.dispatchEvent(event);
+
+    this._state = 'inactive';
   }
 
   /**
@@ -236,42 +209,8 @@ class MediaRecorder extends EventTarget {
       return;
     }
 
-    // Create header data
-    let dataLength = this.encodedBuffers.reduce((acc, cur) => acc + cur.byteLength, 0);
-    let header = new ArrayBuffer(44);
-    let view = new DataView(header);
-    // RIFF identifier 'RIFF'
-    view.setUint32(0, 0x52494646, false);
-    // file length minus RIFF identifier length and file description length
-    view.setUint32(4, 36 + dataLength, true);
-    // RIFF type 'WAVE'
-    view.setUint32(8, 0x57415645, false);
-    // format chunk identifier 'fmt '
-    view.setUint32(12, 0x666d7420, false);
-    // format chunk length
-    view.setUint32(16, 16, true);
-    // sample format (raw)
-    view.setUint16(20, 1, true);
-    // channel count
-    view.setUint16(22, this.channelCount, true);
-    // sample rate
-    view.setUint32(24, this.sampleRate, true);
-    // byte rate (sample rate * block align)
-    view.setUint32(28, this.sampleRate * BYTES_PER_SAMPLE * this.channelCount, true);
-    // block align (channel count * bytes per sample)
-    view.setUint16(32, BYTES_PER_SAMPLE * this.channelCount, true);
-    // bits per sample
-    view.setUint16(34, 8 * BYTES_PER_SAMPLE, true);
-    // data chunk identifier 'data'
-    view.setUint32(36, 0x64617461, false);
-    // data chunk length
-    view.setUint32(40, dataLength, true);
-
-    // Concat two data: [...header, ...encoded]
-    let data = [header, ...this.encodedBuffers];
-    data = new Blob(data, {'type': this._mimeType});
-    this.encodedBuffers = [];
-
+    let buffers = this.encoder.getEncodedBuffers();
+    let data = new Blob(buffers, {'type': this._mimeType});
     // Invoke the callback
     let event = new global.Event('dataavailable');
     event.data = data;
