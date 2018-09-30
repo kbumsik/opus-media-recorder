@@ -1,6 +1,5 @@
 'use strict';
 import {EventTarget, defineEventAttribute} from 'event-target-shim';
-import WaveEncoder from './WaveEncoder.js';
 
 let AudioContext = global.AudioContext || global.webkitAudioContext;
 let BUFFER_SIZE = 4096;
@@ -12,7 +11,7 @@ let BUFFER_SIZE = 4096;
 class MediaRecorder extends EventTarget {
   /**
    *
-   * @param {MediaStream} steam - The MediaStream to be recorded. This will
+   * @param {MediaStream} stream - The MediaStream to be recorded. This will
    *          be the value of the stream attribute.
    * @param {MediaRecorderOptions} [options] - A dictionary of options to for
    *          the UA instructing how the recording will take part.
@@ -31,11 +30,10 @@ class MediaRecorder extends EventTarget {
       return;
     }
 
-    this.context = new AudioContext();
-
     // Get channel count and sampling rate
     // channelCount: https://www.w3.org/TR/mediacapture-streams/#media-track-settings
     // sampleRate: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/sampleRate
+    this.context = new AudioContext();
     let tracks = this.stream.getAudioTracks();
     this.channelCount = tracks[0].getSettings().channelCount;
     this.sampleRate = this.context.sampleRate;
@@ -47,7 +45,7 @@ class MediaRecorder extends EventTarget {
 
     switch (this._mimeType.replace(/\s/g, '')) {
       case 'audio/wave':
-        this.encoder = new WaveEncoder(this, this.processor, this.sampleRate, this.channelCount);
+        this.workerPath = 'WaveWorker.js';
         break;
       default:
         // Should be considered error
@@ -106,6 +104,58 @@ class MediaRecorder extends EventTarget {
     return this._audioBitsPerSecond;
   }
 
+  _postMessageToWorker (command, message = {}) {
+    switch (command) {
+      case 'init':
+        // Initialize the worker
+        let { sampleRate, channelCount } = message;
+        this.worker.postMessage({ command, sampleRate, channelCount });
+        break;
+      case 'pushInputData':
+        // Pass input audio buffer to the encoder to encode.
+        // The worker MAY trigger 'encodedData'.
+        let { channelBuffers, length, duration } = message;
+        this.worker.postMessage({
+          command, channelBuffers, length, duration
+        }, channelBuffers.map(a => a.buffer));
+        break;
+      case 'getEncodedData':
+        // Request encoded result.
+        // Expected 'encodedData' event from the worker
+        this.worker.postMessage({ command });
+        break;
+      case 'done':
+        // Tell encoder finallize the job and destory itself.
+        // Expected 'lastEncodedData' event from the worker.
+        this.worker.postMessage({ command });
+        break;
+      default:
+        // This is an error case
+        break;
+    }
+  }
+
+  _onmessageFromWorker (event) {
+    const { command, buffers } = event.data;
+    switch (command) {
+      case 'encodedData':
+      case 'lastEncodedData':
+        let data = new Blob(buffers, {'type': this._mimeType});
+        let event = new global.Event('dataavailable');
+        event.data = data;
+        this.dispatchEvent(event);
+
+        // Detect of stop() called before
+        if (command === 'lastEncodedData') {
+          let event = new global.Event('stop');
+          this.dispatchEvent(event);
+        }
+        break;
+      default:
+        break; // Ignore
+    }
+  }
+
   /**
    * Begins recording media; this method can optionally be passed a timeslice
    * argument with a value in milliseconds. If this is specified, the media
@@ -132,8 +182,37 @@ class MediaRecorder extends EventTarget {
     }
     timeslice /= 1000; // Convert milliseconds to seconds
 
+    // Initialize worker
+    this.worker = new Worker(this.workerPath);
+    this.worker.onmessage = (e) => this._onmessageFromWorker(e);
+    const { sampleRate, channelCount } = this;
+    this._postMessageToWorker('init', { sampleRate, channelCount });
+
+    // pass frame buffers to the worker
+    let elapsedTime = 0;
+    this.processor.onaudioprocess = (e) => {
+      const { inputBuffer, playbackTime } = e; // eslint-disable-line
+      const { sampleRate, length, duration, numberOfChannels } = inputBuffer; // eslint-disable-line
+
+      // Create channel buffers to pass to the worker
+      const channelBuffers = new Array(numberOfChannels);
+      for (let i = 0; i < numberOfChannels; i++) {
+        channelBuffers[i] = inputBuffer.getChannelData(i);
+      }
+
+      // Pass data to the worker
+      const message = { channelBuffers, length, duration };
+      this._postMessageToWorker('pushInputData', message);
+
+      // Calculate time
+      elapsedTime += duration;
+      if (elapsedTime >= timeslice) {
+        this._postMessageToWorker('getEncodedData');
+        elapsedTime = 0;
+      }
+    };
+
     // Start streaming data
-    this.encoder.start(timeslice);
     this._state = 'recording';
     this.source.connect(this.processor);
     this.processor.connect(this.context.destination);
@@ -153,11 +232,8 @@ class MediaRecorder extends EventTarget {
     this.source.disconnect();
     this.processor.disconnect();
 
-    this.requestData();
-    this.encoder.stop();
-
-    let event = new global.Event('stop');
-    this.dispatchEvent(event);
+    // Stop event will be triggered at _onmessageFromWorker(),
+    this._postMessageToWorker('done');
 
     this._state = 'inactive';
   }
@@ -209,12 +285,8 @@ class MediaRecorder extends EventTarget {
       return;
     }
 
-    let buffers = this.encoder.getEncodedBuffers();
-    let data = new Blob(buffers, {'type': this._mimeType});
-    // Invoke the callback
-    let event = new global.Event('dataavailable');
-    event.data = data;
-    this.dispatchEvent(event);
+    // dataavailable event will be triggerd at _onmessageFromWorker()
+    this._postMessageToWorker('getEncodedData');
   }
 
   /**
