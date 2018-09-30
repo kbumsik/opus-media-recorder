@@ -7,7 +7,7 @@ var config = {
     "library": "[name]",
     "libraryTarget": "umd",
     "libraryExport": "default",
-    "path": `${__dirname}/build`,
+    "path": `${__dirname}/dist`,
     "filename": "[name].js"
   },
   "module": {
@@ -31,7 +31,7 @@ var config = {
     ]
   },
   devServer: {
-    contentBase: [`${__dirname}/example`, `${__dirname}/build`],
+    contentBase: [`${__dirname}/example`, `${__dirname}/dist`],
     compress: true,
     port: 9000,
     https: true
@@ -46,7 +46,7 @@ var MediaRecorder = Object.assign({}, config, {
     "library": "[name]",
     "libraryTarget": "umd",
     "libraryExport": "default",
-    "path": `${__dirname}/build`,
+    "path": `${__dirname}/dist`,
     "filename": "[name].js"
   }
 });
@@ -56,11 +56,21 @@ var WaveWorker = Object.assign({}, config, {
     WaveWorker: ["./src/WaveWorker.js"]
   },
   "output": {
-    "path": `${__dirname}/build`,
+    "path": `${__dirname}/dist`,
     "filename": "WaveWorker.js"
   }
 });
 
+var OggOpusWorker = Object.assign({}, config, {
+  "entry": {
+    OggOpusWorker: ["./src/OggOpusWorker.js"]
+  },
+  "output": {
+    "path": `${__dirname}/build`,
+    "filename": "OggOpusWorker.js"
+  }
+});
+
 module.exports = [
-  MediaRecorder, WaveWorker
+  MediaRecorder, WaveWorker, OggOpusWorker
 ];
