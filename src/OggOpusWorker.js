@@ -400,6 +400,12 @@ self['Module'].onRuntimeInitialized = function () {
 
       case 'pushInputData':
         const { channelBuffers, length, duration } = e.data;
+        // On Chrome, Float32Array doesn't recognize its buffer after transferred.
+        // So re-create Float32Array right after a web worker received it.
+        for (let i = 0; i < oggEncoder.config.numberOfChannels; i++) {
+          channelBuffers[i] = new Float32Array(channelBuffers[i].buffer);
+        }
+
         oggEncoder.encode(channelBuffers, length, duration);
         break;
 

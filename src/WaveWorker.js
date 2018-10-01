@@ -106,6 +106,12 @@ self.onmessage = (e) => {
       break;
     case 'pushInputData':
       const { channelBuffers, length, duration } = e.data;
+      // On Chrome, Float32Array doesn't recognize its buffer after transferred.
+      // So re-create Float32Array right after a web worker received it.
+      for (let i = 0; i < encoder.channelCount; i++) {
+        channelBuffers[i] = new Float32Array(channelBuffers[i].buffer);
+      }
+
       encoder.pushDataToEncode(channelBuffers, length, duration);
       break;
     case 'getEncodedData':
