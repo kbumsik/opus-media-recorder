@@ -30,6 +30,10 @@
 
   <!-- Recording test1 -->
   <div class="content">
+    <select id="mimeSelect">
+      <option value="audio/opus">audio/opus</option>
+      <option value="audio/wave">audio/wave</option>
+    </select>
     <button id="buttonStart">start</button>
     <button id="buttonPause">pause</button>
     <button id="buttonResume">resume</button>
@@ -63,10 +67,13 @@
         window.recorder.start(milliSeconds);
         return;
       }
-      window.recorder = new MediaRecorder(stream);
+      let e = document.querySelector('#mimeSelect');
+      let mimeSelect = e.options[e.selectedIndex].text;
+      let config = {
+        mimeType: mimeSelect
+      };
+      window.recorder = new MediaRecorder(stream, config);
       let { recorder } = window;
-      console.log(recorder.videoBitsPerSecond);
-      console.log(recorder.audioBitsPerSecond);
 
       // Start recording
       let chunks = [];
@@ -98,7 +105,7 @@
 
       recorder.onstop = function (e) {
         console.log('data available after MediaRecorder.stop() called.');
-        let blob = new Blob(chunks, {'type': 'audio/wave'});
+        let blob = new Blob(chunks, {'type': mimeSelect});
         chunks = [];
         let audioURL = URL.createObjectURL(blob);
         let player = document.querySelector('#player');

@@ -91,6 +91,8 @@ class _WaveEncoder {
   }
 }
 
+// Notify the host ready to accept 'init' message.
+self.postMessage({ command: 'readyToInit' });
 /**
  * Web Worker interface for encoder.
  */

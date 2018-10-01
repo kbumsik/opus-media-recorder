@@ -22,7 +22,7 @@ class MediaRecorder extends EventTarget {
     super();
     // Attributes for the specification conformance. These have their own getters.
     this._stream = stream;
-    this._mimeType = 'audio/wave';
+    this._mimeType = options.mimeType || 'audio/wave';
     this._state = 'inactive';
     this._audioBitsPerSecond = undefined;
     if (!MediaRecorder.isTypeSupported(this._mimeType)) {
@@ -46,6 +46,9 @@ class MediaRecorder extends EventTarget {
     switch (this._mimeType.replace(/\s/g, '')) {
       case 'audio/wave':
         this.workerPath = 'WaveWorker.js';
+        break;
+      case 'audio/opus':
+        this.workerPath = 'OggOpusWorker.js';
         break;
       default:
         // Should be considered error
@@ -138,6 +141,14 @@ class MediaRecorder extends EventTarget {
   _onmessageFromWorker (event) {
     const { command, buffers } = event.data;
     switch (command) {
+      case 'readyToInit':
+        const { sampleRate, channelCount } = this;
+        this._postMessageToWorker('init', { sampleRate, channelCount });
+
+        // Start streaming
+        this.source.connect(this.processor);
+        this.processor.connect(this.context.destination);
+        break;
       case 'encodedData':
       case 'lastEncodedData':
         let data = new Blob(buffers, {'type': this._mimeType});
@@ -185,8 +196,6 @@ class MediaRecorder extends EventTarget {
     // Initialize worker
     this.worker = new Worker(this.workerPath);
     this.worker.onmessage = (e) => this._onmessageFromWorker(e);
-    const { sampleRate, channelCount } = this;
-    this._postMessageToWorker('init', { sampleRate, channelCount });
 
     // pass frame buffers to the worker
     let elapsedTime = 0;
@@ -214,8 +223,6 @@ class MediaRecorder extends EventTarget {
 
     // Start streaming data
     this._state = 'recording';
-    this.source.connect(this.processor);
-    this.processor.connect(this.context.destination);
   }
 
   /**
