@@ -1,8 +1,9 @@
 'use strict';
 import {EventTarget, defineEventAttribute} from 'event-target-shim';
 
-let AudioContext = global.AudioContext || global.webkitAudioContext;
-let BUFFER_SIZE = 4096;
+const AudioContext = global.AudioContext || global.webkitAudioContext;
+const BUFFER_SIZE = 4096;
+const DOM_INVALID_STATE_ERR = 11;
 
 /**
  * Reference: https://w3c.github.io/mediacapture-record/#mediarecorder-api
@@ -22,14 +23,27 @@ class MediaRecorder extends EventTarget {
     super();
     // Attributes for the specification conformance. These have their own getters.
     this._stream = stream;
-    this._mimeType = options.mimeType || 'audio/wave';
     this._state = 'inactive';
+    this._mimeType = undefined;
     this._audioBitsPerSecond = undefined;
-    if (!MediaRecorder.isTypeSupported(this._mimeType)) {
-      // TODO: Throw what?
-      return;
+    // Parse MIME Type
+    let mime = options.mimeType || '';
+    if (!MediaRecorder.isTypeSupported(mime)) {
+      throw new TypeError('invalid arguments, a MIME Type is not supported');
     }
+    switch (MediaRecorder._parseType(mime).subtype) {
+      case 'wave':
+      case 'wav':
+        this.workerPath = 'WaveWorker.js';
+        this._mimeType = options.mimeType;
+        break;
 
+      case 'audio/ogg':
+      default:
+        this.workerPath = 'OggOpusWorker.js';
+        this._mimeType = 'audio/ogg';
+        break;
+    }
     // Get channel count and sampling rate
     // channelCount: https://www.w3.org/TR/mediacapture-streams/#media-track-settings
     // sampleRate: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/sampleRate
@@ -42,18 +56,6 @@ class MediaRecorder extends EventTarget {
     this.source = this.context.createMediaStreamSource(this.stream);
     /** @type {ScriptProcessorNode} */
     this.processor = this.context.createScriptProcessor(BUFFER_SIZE, this.channelCount, this.channelCount);
-
-    switch (this._mimeType.replace(/\s/g, '')) {
-      case 'audio/wave':
-        this.workerPath = 'WaveWorker.js';
-        break;
-      case 'audio/opus':
-        this.workerPath = 'OggOpusWorker.js';
-        break;
-      default:
-        // Should be considered error
-        break;
-    }
   }
 
   /**
@@ -107,6 +109,21 @@ class MediaRecorder extends EventTarget {
     return this._audioBitsPerSecond;
   }
 
+  _DOMException (message, name) {
+    this.message = 'DOMException: ' + message;
+    switch (name) {
+      case 'INVALID_STATE_ERR':
+        this.code = DOM_INVALID_STATE_ERR;
+        break;
+    }
+    this.name = name;
+  }
+
+  /**
+   * Post message to the encoder web worker.
+   * @param {"init"|"pushInputData"|"getEncodedData"|"done"} command - Type of message to send to the worker
+   * @param {object} message - Payload to the worker
+   */
   _postMessageToWorker (command, message = {}) {
     switch (command) {
       case 'init':
@@ -114,6 +131,7 @@ class MediaRecorder extends EventTarget {
         let { sampleRate, channelCount } = message;
         this.worker.postMessage({ command, sampleRate, channelCount });
         break;
+
       case 'pushInputData':
         // Pass input audio buffer to the encoder to encode.
         // The worker MAY trigger 'encodedData'.
@@ -122,22 +140,29 @@ class MediaRecorder extends EventTarget {
           command, channelBuffers, length, duration
         }, channelBuffers.map(a => a.buffer));
         break;
+
       case 'getEncodedData':
         // Request encoded result.
         // Expected 'encodedData' event from the worker
         this.worker.postMessage({ command });
         break;
+
       case 'done':
         // Tell encoder finallize the job and destory itself.
         // Expected 'lastEncodedData' event from the worker.
         this.worker.postMessage({ command });
         break;
+
       default:
         // This is an error case
         break;
     }
   }
 
+  /**
+   * onmessage() callback from the worker.
+   * @param {message} event - message from the worker
+   */
   _onmessageFromWorker (event) {
     const { command, buffers } = event.data;
     switch (command) {
@@ -149,6 +174,7 @@ class MediaRecorder extends EventTarget {
         this.source.connect(this.processor);
         this.processor.connect(this.context.destination);
         break;
+
       case 'encodedData':
       case 'lastEncodedData':
         let data = new Blob(buffers, {'type': this._mimeType});
@@ -162,41 +188,18 @@ class MediaRecorder extends EventTarget {
           this.dispatchEvent(event);
         }
         break;
+
       default:
         break; // Ignore
     }
   }
 
   /**
-   * Begins recording media; this method can optionally be passed a timeslice
-   * argument with a value in milliseconds. If this is specified, the media
-   * will be captured in separate chunks of that duration, rather than the
-   * default behavior of recording the media in a single large chunk.
-   * @param {number} timeslice - If timeslice is not undefined, then once a
-   *          minimum of timeslice milliseconds of data have been collected,
-   *          or some minimum time slice imposed by the UA, whichever is
-   *          greater, start gathering data into a new Blob blob, and queue
-   *          a task, using the DOM manipulation task source, that fires
-   *          a blob event named dataavailable at target with blob.
-   *
-   *          Note that an undefined value of timeslice will be understood as
-   *          the largest long value.
+   * Enable onaudioprocess() callback.
+   * @param {number} timeslice - In seconds. MediaRecorder should request data
+   *                              from the worker every timeslice seconds.
    */
-  start (timeslice = Number.MAX_SAFE_INTEGER) {
-    if (this.state !== 'inactive') {
-      // Throw DOM_INVALID_STATE_ERR
-      return;
-    }
-    if (timeslice < 0) {
-      // Throw ERR_INVALID_ARG
-      return;
-    }
-    timeslice /= 1000; // Convert milliseconds to seconds
-
-    // Initialize worker
-    this.worker = new Worker(this.workerPath);
-    this.worker.onmessage = (e) => this._onmessageFromWorker(e);
-
+  _enableAudioProcessCallback (timeslice) {
     // pass frame buffers to the worker
     let elapsedTime = 0;
     this.processor.onaudioprocess = (e) => {
@@ -220,9 +223,30 @@ class MediaRecorder extends EventTarget {
         elapsedTime = 0;
       }
     };
+  }
 
-    // Start streaming data
+  /**
+   * Begins recording media; this method can optionally be passed a timeslice
+   * argument with a value in milliseconds.
+   * @param {number} timeslice - If this is specified, the media will be captured
+   *        in separate chunks of that duration, rather than the default behavior
+   *        of recording the media in a single large chunk. In other words, an
+   *        undefined value of timeslice will be understood as the largest long value.
+   */
+  start (timeslice = Number.MAX_SAFE_INTEGER) {
+    if (this.state !== 'inactive') {
+      throw new this._DOMException('state must be inactive', 'INVALID_STATE_ERR');
+    }
+    if (timeslice < 0) {
+      throw new TypeError('invalid arguments, timeslice should be 0 or higher.');
+    }
+    timeslice /= 1000; // Convert milliseconds to seconds
     this._state = 'recording';
+    this._enableAudioProcessCallback(timeslice);
+
+    // Initialize worker
+    this.worker = new Worker(this.workerPath);
+    this.worker.onmessage = (e) => this._onmessageFromWorker(e);
   }
 
   /**
@@ -231,8 +255,7 @@ class MediaRecorder extends EventTarget {
    */
   stop () {
     if (this.state === 'inactive') {
-      // Throw DOM_INVALID_STATE_ERR
-      return;
+      throw new this._DOMException('state must NOT be inactive', 'INVALID_STATE_ERR');
     }
 
     // Stop stream first
@@ -249,9 +272,8 @@ class MediaRecorder extends EventTarget {
    * Pauses the recording of media.
    */
   pause () {
-    if (this.state !== 'recording') {
-      // Throw DOM_INVALID_STATE_ERR
-      return;
+    if (this.state === 'inactive') {
+      throw new this._DOMException('state must be recording', 'INVALID_STATE_ERR');
     }
 
     // Stop stream first
@@ -267,9 +289,8 @@ class MediaRecorder extends EventTarget {
    * Resumes recording of media after having been paused.
    */
   resume () {
-    if (this.state !== 'paused') {
-      // Throw DOM_INVALID_STATE_ERR
-      return;
+    if (this.state === 'inactive') {
+      throw new this._DOMException('state must be paused', 'INVALID_STATE_ERR');
     }
 
     // Start streaming data
@@ -288,8 +309,7 @@ class MediaRecorder extends EventTarget {
    */
   requestData () {
     if (this.state === 'inactive') {
-      // Throw DOM_INVALID_STATE_ERR
-      return;
+      throw new this._DOMException('state must NOT be inactive', 'INVALID_STATE_ERR');
     }
 
     // dataavailable event will be triggerd at _onmessageFromWorker()
@@ -299,15 +319,63 @@ class MediaRecorder extends EventTarget {
   /**
    * Returns a Boolean value indicating if the given MIME type is supported
    * by the current user agent .
-   * @param {string} type - A MIME Type, including parameters when needed,
+   * @param {string} typeType - A MIME Type, including parameters when needed,
    *          specifying a container and/or codec formats for recording.
    * @return {boolean}
    */
-  static isTypeSupported (type) {
-    if (type === '') {
+  static isTypeSupported (mimeType) {
+    // See: https://w3c.github.io/mediacapture-record/#dom-mediarecorder-istypesupported
+
+    // 1. If empty string, return true.
+    if (typeof mimeType === 'string' && !mimeType) {
       return true;
     }
+    try {
+      var {type, subtype, codec} = MediaRecorder._parseType(mimeType);
+    } catch (error) {
+      // 2. If not a valid string, return false.
+      return false;
+    }
+    if (type !== 'audio' ||
+      !(subtype === 'ogg' || subtype === 'wave' || subtype === 'wav')) {
+      // 3,4. If type and subtype are unsupported the return false.
+      return false;
+    }
+    // 5. If codec is unsupported then return false.
+    // 6. If the specified combination of all is not supported than return false.
+    if (subtype === 'ogg') {
+      if (codec !== 'opus' && codec) {
+        return false;
+      }
+    } else if (subtype === 'wave' || subtype === 'wav') {
+      if (codec) {
+        return false; // Currently only supports signed 16 bits
+      }
+    }
+    // 7. return true.
     return true;
+  }
+
+  /**
+   * Parse MIME. A helper function for isTypeSupported() and etc.
+   * @param {string} mimeType - typeType - A MIME Type, including parameters when needed,
+   *          specifying a container and/or codec formats for recording.
+   * @return {?object} - An object with type, subtype, codec attributes
+   *          if parsed correctly. null is returned if parsing failed.
+   *          If mimeType is an empty string then return an object with attributes
+   *          are empty strings
+   */
+  static _parseType (mimeType) {
+    try {
+      const regex = /^(\w+)\/(\w+)(;\s*codecs=(\w+))?$/;
+      var [, type, subtype, , codec] = mimeType.match(regex);
+    } catch (error) {
+      if (typeof mimeType === 'string' && !mimeType) {
+        return {type: '', subtype: '', codec: ''};
+      }
+      return null;
+    }
+    return {type, subtype, codec};
   }
 }
 
