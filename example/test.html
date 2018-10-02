@@ -20,7 +20,27 @@
       padding: 10px 10px 10px 10px;
       margin: 10px 10px 10px 10px;
     }
+    div#errorLog {
+      text-align: left;
+      white-space: pre;
+      font-size: 12px;
+    }
   </style>
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Override console.log
+    function override_console (old_function, div_log) {
+        return function (text) {
+            old_function(text);
+            div_log.innerHTML += text + '<br>';
+        };
+    };
+    console.log = override_console(console.log.bind(console), document.getElementById("errorLog"));
+    console.error = override_console(console.error.bind(console), document.getElementById("errorLog"));
+    console.debug = override_console(console.debug.bind(console), document.getElementById("errorLog"));
+    console.info = override_console(console.info.bind(console), document.getElementById("errorLog"));
+  }, false);
+  </script>
 </head>
 
 <body>
@@ -28,11 +48,14 @@
     Opus MediaRecorder Example
   </div>
 
-  <!-- Recording test1 -->
+  <!-- Recording -->
   <div class="content">
     <select id="mimeSelect">
-      <option value="audio/opus">audio/opus</option>
+      <option value="">default</option>
+      <option value="audio/ogg">audio/ogg</option>
+      <option value="audio/webm">audio/webm</option>
       <option value="audio/wave">audio/wave</option>
+      <option value="wrong_mime">wrong_mime (for testing)</option>
     </select>
     <button id="buttonStart">start</button>
     <button id="buttonPause">pause</button>
@@ -42,6 +65,7 @@
     <a id="link">link</a>
     <script src="MediaRecorder.js"></script>
     <script>
+    var recorder;
     var handleSuccess = function (stream) {
       // print stream information (for debugging)
       for (const track of stream.getAudioTracks()) {
@@ -62,18 +86,24 @@
 
       let milliSeconds = 15000;
       // Create recorder object
-      if (typeof window.recorder !== 'undefined') {
-        console.log('recorder already exists');
-        window.recorder.start(milliSeconds);
-        return;
-      }
       let e = document.querySelector('#mimeSelect');
-      let mimeSelect = e.options[e.selectedIndex].text;
-      let config = {
-        mimeType: mimeSelect
-      };
-      window.recorder = new MediaRecorder(stream, config);
-      let { recorder } = window;
+      let mimeSelect = e.options[e.selectedIndex].value;
+      if (typeof recorder !== 'undefined') {
+        if (recorder.mimeType !== mimeSelect) {
+          console.log('a new recorder is created with different mime');
+        } else {
+          recorder.start(milliSeconds);
+          return;
+        }
+      }
+      if (mimeSelect) {
+        let config = {
+          mimeType: mimeSelect
+        };
+        recorder = new MediaRecorder(stream, config);
+      } else {
+        recorder = new MediaRecorder(stream);
+      }
 
       // Start recording
       let chunks = [];
@@ -119,14 +149,17 @@
     // Start Button
     var buttonStart = document.querySelector('#buttonStart');
     buttonStart.onclick = () => {
+      if (navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia({audio: true, video: false})
         .then(handleSuccess);
+      } else {
+        navigator.getUserMedia({audio: true, video: false}, handleSuccess, _ => {});
+      }
     };
     
     // Check compability
     if (window.MediaRecorder === undefined) {
-      console.error('MediaRecorder not supported, boo');
-      alert('MediaRecorder not supported, boo');
+      console.error('No MediaRecorder found');
     } else {
       var contentTypes = [
         'audio/wave',
@@ -143,6 +176,10 @@
       });
     };
     </script>
+  </div>
+
+  <div id='errorLog'>
+    <!-- console.log will be printed here -->
   </div>
 
 </body>
