@@ -49,7 +49,7 @@ class MediaRecorder extends EventTarget {
     // sampleRate: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/sampleRate
     this.context = new AudioContext();
     let tracks = this.stream.getAudioTracks();
-    this.channelCount = tracks[0].getSettings().channelCount;
+    this.channelCount = tracks[0].getSettings().channelCount || 1;
     this.sampleRate = this.context.sampleRate;
 
     /** @type {MediaStreamAudioSourceNode} */
