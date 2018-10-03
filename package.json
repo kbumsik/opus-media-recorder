@@ -5,6 +5,7 @@
   "main": "src/MediaRecorder.js",
   "scripts": {
     "build": "webpack-cli --config webpack.config.js",
+    "build:production": "webpack-cli --mode=production --config webpack.config.js",
     "start": "npm run build && make && webpack-dev-server",
     "clean": "make clean"
   },

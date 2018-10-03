@@ -4,10 +4,20 @@ export BUILD_DIR = $(abspath ./build)
 DIST_DIR = ./dist
 
 # For Emscripten
-EMCC_OPTS=-O3 --llvm-lto 1 -s NO_DYNAMIC_EXECUTION=1 -s NO_FILESYSTEM=1
+EMCC_OPTS=-g3 -O3 --llvm-lto 1 -s NO_DYNAMIC_EXECUTION=1 -s NO_FILESYSTEM=1
 DEFAULT_EXPORTS:='_malloc','_free'
 OPUS_EXPORTS:='_opus_encoder_create','_opus_encode_float','_opus_encoder_ctl'
 SPEEX_EXPORTS:='_speex_resampler_init','_speex_resampler_process_interleaved_float','_speex_resampler_destroy'
+
+# For JavaScript build
+NPM_BUILD_CMD = build
+
+# Options for production
+ifdef PRODUCTION
+	EMCC_OPTS := $(filter-out -g3, $(EMCC_OPTS))
+	EMCC_OPTS += -g0
+	NPM_BUILD_CMD = build:production
+endif
 
 # C compiled static libraries
 export OPUS_OBJ = $(BUILD_DIR)/libopus.a
@@ -29,14 +39,14 @@ $(DIST_DIR):
 
 # Building libraries
 $(BUILD_DIR)/%.js: $(SRC_DIR)/%.js
-	npm run build
+	npm run $(NPM_BUILD_CMD)
 
 $(BUILD_DIR)/%.a:
 	make -C $(LIB_DIR) $@
 
 $(OGG_OPUS_WORKER): $(OGG_OPUS_JS) $(OPUS_OBJ) $(OGG_OBJ) $(SPEEX_OBJ) $(DIST_DIR)
-	emcc -o $@ $(EMCC_OPTS) -g3 -s \
-		EXPORTED_FUNCTIONS="[$(DEFAULT_EXPORTS),$(OPUS_EXPORTS),$(SPEEX_EXPORTS)]" \
+	emcc -o $@ $(EMCC_OPTS) \
+		-s EXPORTED_FUNCTIONS="[$(DEFAULT_EXPORTS),$(OPUS_EXPORTS),$(SPEEX_EXPORTS)]" \
 		--pre-js $< $(OPUS_OBJ) $(SPEEX_OBJ)
 
 # etc.

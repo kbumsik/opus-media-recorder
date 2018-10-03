@@ -129,7 +129,7 @@ Browsers with issues:
 
 2. `npm install` to install JavaScript dependencies.
 
-3. `make all` to build.
+3. `make all` to build. `PRODUCTION=1 make all` to build for production.
 
 4. `npm run start` to run a test web server locally.
 
