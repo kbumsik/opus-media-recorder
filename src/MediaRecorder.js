@@ -392,4 +392,16 @@ class MediaRecorder extends EventTarget {
   'error' // Called to handle a MediaRecorderErrorEvent.
 ].forEach(name => defineEventAttribute(MediaRecorder.prototype, name));
 
+// MS Edge specific monkey patching:
+// onaudioprocess callback cannot be triggered more than twice when postMessage
+// uses the seconde transfer argument. So disable the transfer argument only in Edge.
+if (/Edge/.test(navigator.userAgent)) {
+  (function () {
+    var original = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (message, transfer = null) {
+      original.apply(this, [message]);
+    };
+  })();
+}
+
 export default MediaRecorder;
