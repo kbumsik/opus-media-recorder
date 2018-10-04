@@ -119,7 +119,7 @@
       // When stopped add a link to the player and the download link
       recorder.onstop = function (e) {
         // Create a file
-        let blob = new Blob(dataChunks, {'type': mimeSelect});
+        let blob = new Blob(dataChunks, {'type': recorder.mimeType});
         dataChunks = [];
         let audioURL = URL.createObjectURL(blob);
         let player = document.querySelector('#player');

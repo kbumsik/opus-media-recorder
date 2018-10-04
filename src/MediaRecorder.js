@@ -2,6 +2,8 @@
 import {EventTarget, defineEventAttribute} from 'event-target-shim';
 
 const AudioContext = global.AudioContext || global.webkitAudioContext;
+const scriptPath = document.currentScript.src;
+const scriptDirectory = scriptPath.substring(0, scriptPath.lastIndexOf('/')) + '/';
 const BUFFER_SIZE = 4096;
 
 /**
@@ -33,13 +35,13 @@ class MediaRecorder extends EventTarget {
     switch (MediaRecorder._parseType(mime).subtype) {
       case 'wave':
       case 'wav':
-        this.workerPath = 'WaveWorker.js';
+        this.workerPath = scriptDirectory + 'WaveWorker.js';
         this._mimeType = options.mimeType;
         break;
 
       case 'audio/ogg':
       default:
-        this.workerPath = 'OggOpusWorker.js';
+        this.workerPath = scriptDirectory + 'OggOpusWorker.js';
         this._mimeType = 'audio/ogg';
         break;
     }
