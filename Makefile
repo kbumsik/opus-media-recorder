@@ -2,6 +2,7 @@ LIB_DIR = ./lib
 SRC_DIR = ./src
 export BUILD_DIR = $(abspath ./build)
 DIST_DIR = ./dist
+DOCS_DIR = ./docs
 
 # For Emscripten
 EMCC_OPTS=-g3 -O3 --llvm-lto 1 -s NO_DYNAMIC_EXECUTION=1 -s NO_FILESYSTEM=1
@@ -29,10 +30,14 @@ OGG_OPUS_JS = $(BUILD_DIR)/OggOpusWorker.js
 
 # Final targets
 OGG_OPUS_WORKER = $(DIST_DIR)/OggOpusWorker.js
+OUTPUT_FILES = MediaRecorder.js OggOpusWorker.js OggOpusWorker.wasm WaveWorker.js
+
+# Assets in docs folder
+DOCS_ASSETS = $(addprefix $(DOCS_DIR)/assets/, $(OUTPUT_FILES))
 
 .PHONY: all clean
 
-all: $(OGG_OPUS_WORKER)
+all: $(OGG_OPUS_WORKER) $(DOCS_ASSETS)
 
 $(DIST_DIR):
 	mkdir $@
@@ -48,6 +53,9 @@ $(OGG_OPUS_WORKER): $(OGG_OPUS_JS) $(OPUS_OBJ) $(OGG_OBJ) $(SPEEX_OBJ) $(DIST_DI
 	emcc -o $@ $(EMCC_OPTS) \
 		-s EXPORTED_FUNCTIONS="[$(DEFAULT_EXPORTS),$(OPUS_EXPORTS),$(SPEEX_EXPORTS)]" \
 		--pre-js $< $(OPUS_OBJ) $(SPEEX_OBJ)
+
+$(DOCS_DIR)/assets/%: $(DIST_DIR)/%
+	cp -f $< $@
 
 # etc.
 clean:

@@ -52,7 +52,7 @@ var recorder = new MediaRecorder(stream);
 
 ### JavaScript
 
-For futher usages, see the [MDN reference](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder), our [examples](example), and other online resources.
+For futher usages, see the [MDN reference](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder), our [example](docs), and other online resources.
 
 ```javascript
 window.MediaRecorder = require('opus-media-recorder');
