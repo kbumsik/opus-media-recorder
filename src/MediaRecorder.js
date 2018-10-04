@@ -3,7 +3,6 @@ import {EventTarget, defineEventAttribute} from 'event-target-shim';
 
 const AudioContext = global.AudioContext || global.webkitAudioContext;
 const BUFFER_SIZE = 4096;
-const DOM_INVALID_STATE_ERR = 11;
 
 /**
  * Reference: https://w3c.github.io/mediacapture-record/#mediarecorder-api
@@ -109,16 +108,6 @@ class MediaRecorder extends EventTarget {
     return this._audioBitsPerSecond;
   }
 
-  _DOMException (message, name) {
-    this.message = 'DOMException: ' + message;
-    switch (name) {
-      case 'INVALID_STATE_ERR':
-        this.code = DOM_INVALID_STATE_ERR;
-        break;
-    }
-    this.name = name;
-  }
-
   /**
    * Post message to the encoder web worker.
    * @param {"init"|"pushInputData"|"getEncodedData"|"done"} command - Type of message to send to the worker
@@ -165,6 +154,7 @@ class MediaRecorder extends EventTarget {
    */
   _onmessageFromWorker (event) {
     const { command, buffers } = event.data;
+    let eventToPush;
     switch (command) {
       case 'readyToInit':
         const { sampleRate, channelCount } = this;
@@ -173,19 +163,21 @@ class MediaRecorder extends EventTarget {
         // Start streaming
         this.source.connect(this.processor);
         this.processor.connect(this.context.destination);
+        eventToPush = new global.Event('start');
+        this.dispatchEvent(eventToPush);
         break;
 
       case 'encodedData':
       case 'lastEncodedData':
         let data = new Blob(buffers, {'type': this._mimeType});
-        let event = new global.Event('dataavailable');
-        event.data = data;
-        this.dispatchEvent(event);
+        eventToPush = new global.Event('dataavailable');
+        eventToPush.data = data;
+        this.dispatchEvent(eventToPush);
 
         // Detect of stop() called before
         if (command === 'lastEncodedData') {
-          let event = new global.Event('stop');
-          this.dispatchEvent(event);
+          eventToPush = new global.Event('stop');
+          this.dispatchEvent(eventToPush);
         }
         break;
 
@@ -235,7 +227,7 @@ class MediaRecorder extends EventTarget {
    */
   start (timeslice = Number.MAX_SAFE_INTEGER) {
     if (this.state !== 'inactive') {
-      throw new this._DOMException('state must be inactive', 'INVALID_STATE_ERR');
+      throw new Error('DOMException: INVALID_STATE_ERR, state must be inactive.');
     }
     if (timeslice < 0) {
       throw new TypeError('invalid arguments, timeslice should be 0 or higher.');
@@ -255,7 +247,7 @@ class MediaRecorder extends EventTarget {
    */
   stop () {
     if (this.state === 'inactive') {
-      throw new this._DOMException('state must NOT be inactive', 'INVALID_STATE_ERR');
+      throw new Error('DOMException: INVALID_STATE_ERR, state must NOT be inactive.');
     }
 
     // Stop stream first
@@ -273,7 +265,7 @@ class MediaRecorder extends EventTarget {
    */
   pause () {
     if (this.state === 'inactive') {
-      throw new this._DOMException('state must be recording', 'INVALID_STATE_ERR');
+      throw new Error('DOMException: INVALID_STATE_ERR, state must NOT be inactive.');
     }
 
     // Stop stream first
@@ -290,10 +282,10 @@ class MediaRecorder extends EventTarget {
    */
   resume () {
     if (this.state === 'inactive') {
-      throw new this._DOMException('state must be paused', 'INVALID_STATE_ERR');
+      throw new Error('DOMException: INVALID_STATE_ERR, state must NOT be inactive.');
     }
 
-    // Start streaming data
+    // Restart streaming data
     this.source.connect(this.processor);
     this.processor.connect(this.context.destination);
 
@@ -309,7 +301,7 @@ class MediaRecorder extends EventTarget {
    */
   requestData () {
     if (this.state === 'inactive') {
-      throw new this._DOMException('state must NOT be inactive', 'INVALID_STATE_ERR');
+      throw new Error('DOMException: INVALID_STATE_ERR, state must NOT be inactive.');
     }
 
     // dataavailable event will be triggerd at _onmessageFromWorker()
