@@ -31,7 +31,7 @@ var config = {
     ]
   },
   devServer: {
-    contentBase: [`${__dirname}/example`, `${__dirname}/dist`],
+    contentBase: [`${__dirname}/docs`, `${__dirname}/dist`],
     compress: true,
     port: 9000,
     https: true
