@@ -314,7 +314,7 @@ class _OggOpusEncoder {
     offset += 4;
 
     this.segmentTableIndex = 1;
-    this.segmentDataIndex = this.segmentTable[0] = 26;
+    this.segmentDataIndex = this.segmentTable[0] = offset;
     this.headerType = 0;
     this.OggGeneratePage();
   }
