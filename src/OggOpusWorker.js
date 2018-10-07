@@ -39,24 +39,31 @@ const OGG_SERIAL = Math.floor(Math.random() * 0xFFFFFFFF); // Bitstream serial n
 
 const BUFFER_LENGTH = 4096;
 
+/**
+ * Emscripten (wasm) Module. Module is globally defined after compiling with emcc.
+ * String indexing is used to prevent transpilers (e.g. babel) from changing name.
+ */
+self['Module'] = {};
+const WASM = self['Module'];
+
 class _OggOpusEncoder {
-  constructor (inputSampleRate, channelCount, moduleRef) {
+  constructor (inputSampleRate, channelCount) {
     this.config = {
       inputSampleRate, // Usually 44100Hz or 48000Hz
       channelCount
     };
     this.encodedBuffers = [];
 
-    this._opus_encoder_create = moduleRef._opus_encoder_create;
-    this._opus_encoder_ctl = moduleRef._opus_encoder_ctl;
-    this._speex_resampler_process_interleaved_float = moduleRef._speex_resampler_process_interleaved_float;
-    this._speex_resampler_init = moduleRef._speex_resampler_init;
-    this._opus_encode_float = moduleRef._opus_encode_float;
-    this._free = moduleRef._free;
-    this._malloc = moduleRef._malloc;
-    this._HEAPU8 = moduleRef.HEAPU8;
-    this._HEAP32 = moduleRef.HEAP32;
-    this._HEAPF32 = moduleRef.HEAPF32;
+    this._opus_encoder_create = WASM._opus_encoder_create;
+    this._opus_encoder_ctl = WASM._opus_encoder_ctl;
+    this._speex_resampler_process_interleaved_float = WASM._speex_resampler_process_interleaved_float;
+    this._speex_resampler_init = WASM._speex_resampler_init;
+    this._opus_encode_float = WASM._opus_encode_float;
+    this._free = WASM._free;
+    this._malloc = WASM._malloc;
+    this._HEAPU8 = WASM.HEAPU8;
+    this._HEAP32 = WASM.HEAP32;
+    this._HEAPF32 = WASM.HEAPF32;
 
     this.pageIndex = 0;
     this.granulePosition = 0;
@@ -378,12 +385,7 @@ class _OggOpusEncoder {
 }
 
 var oggEncoder;
-/**
- * Emscripten (wasm) Module. Module is globally defined after compiling with emcc.
- * String indexing is used to prevent transpilers (e.g. babel) from changing name.
- */
-self['Module'] = {};
-self['Module'].onRuntimeInitialized = function () {
+WASM.onRuntimeInitialized = function () {
   // Emscripten (wasm) module is loaded
   // and notify the host ready to accept 'init' message.
   self.postMessage({ command: 'readyToInit' });
@@ -393,7 +395,7 @@ self['Module'].onRuntimeInitialized = function () {
     switch (command) {
       case 'init':
         const { sampleRate, channelCount } = e.data;
-        oggEncoder = new _OggOpusEncoder(sampleRate, channelCount, self['Module']);
+        oggEncoder = new _OggOpusEncoder(sampleRate, channelCount);
         break;
 
       case 'pushInputData':
