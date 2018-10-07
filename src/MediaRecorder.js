@@ -189,6 +189,23 @@ class MediaRecorder extends EventTarget {
   }
 
   /**
+   * onerror() callback from the worker.
+   * @param {ErrorEvent} error - error object from the worker
+   */
+  _onerrorFromWorker (error) {
+    let message = [
+      'FileName: ' + error.filename,
+      'LineNumber: ' + error.lineno,
+      'Message: ' + error.message
+    ].join(' - ');
+
+    let errorToPush = new global.Event('error');
+    errorToPush.name = 'UnknownError';
+    errorToPush.message = message;
+    this.dispatchEvent(errorToPush);
+  }
+
+  /**
    * Enable onaudioprocess() callback.
    * @param {number} timeslice - In seconds. MediaRecorder should request data
    *                              from the worker every timeslice seconds.
@@ -241,6 +258,7 @@ class MediaRecorder extends EventTarget {
     // Initialize worker
     this.worker = new Worker(this.workerPath);
     this.worker.onmessage = (e) => this._onmessageFromWorker(e);
+    this.worker.onerror = (e) => this._onerrorFromWorker(e);
   }
 
   /**
