@@ -26,6 +26,9 @@
 
 import { writeString } from './commonFunctions.js';
 
+/**
+ * Configuration
+ */
 const OPUS_APPLICATION = 2049; /** Defined in opus_defines.h
                                 *  2048: OPUS_APPLICATION_VOIP = Voice (Lower fidelity)
                                 *  2049: OPUS_APPLICATION_AUDIO = Full Band Audio (Highest fidelity)
@@ -33,7 +36,6 @@ const OPUS_APPLICATION = 2049; /** Defined in opus_defines.h
 const OPUS_OUTPUT_SAMPLE_RATE = 48000; // Desired encoding sample rate. Audio will be resampled
 const OPUS_OUTPUT_MAX_LENGTH = 4000;
 const OPUS_FRAME_SIZE = 20; // Specified in ms.
-const OPUS_SET_BITRATE_REQUEST = 4002; // Defined in opus_defines.h
 
 const SPEEX_RESAMPLE_QUALITY = 6; // Value between 0 and 10 inclusive. 10 being highest quality.
 
@@ -41,6 +43,15 @@ const OGG_MAX_BUFFERS_PER_PAGE = 10; // Tradeoff latency with overhead
 const OGG_SERIAL = Math.floor(Math.random() * 0xFFFFFFFF); // Bitstream serial number, any random 32-bit number
 
 const BUFFER_LENGTH = 4096;
+
+/**
+ * Constants used for libraries
+ */;
+// in opus_defines.h
+const OPUS_OK = 0;
+const OPUS_SET_BITRATE_REQUEST = 4002;
+// in speex_resampler.h
+const RESAMPLER_ERR_SUCCESS = 0;
 
 /**
  * Emscripten (wasm) Module. Module is globally defined after compiling with emcc.
@@ -186,12 +197,15 @@ class _OggOpusEncoder {
     };
     this.encodedBuffers = [];
 
-    // Functions imported from WASM
+    // libopus functions imported from WASM
     this._opus_encoder_create = WASM._opus_encoder_create;
     this._opus_encoder_ctl = WASM._opus_encoder_ctl;
-    this._speex_resampler_process_interleaved_float = WASM._speex_resampler_process_interleaved_float;
-    this._speex_resampler_init = WASM._speex_resampler_init;
     this._opus_encode_float = WASM._opus_encode_float;
+    this._opus_encoder_destroy = WASM._opus_encoder_destroy;
+    // SpeexDSP functions
+    this._speex_resampler_init = WASM._speex_resampler_init;
+    this._speex_resampler_process_interleaved_float = WASM._speex_resampler_process_interleaved_float;
+    this._speex_resampler_destroy = WASM._speex_resampler_destroy;
 
     // Attributes for OGG packing
     this.pageIndex = 0;
@@ -227,23 +241,31 @@ class _OggOpusEncoder {
     let sampleIndex = 0;
 
     while (sampleIndex < samples.length) {
+      // Copy samples to input buffer
       let lengthToCopy = Math.min(this.mInputBuffer.length - this.inputBufferIndex, samples.length - sampleIndex);
       this.mInputBuffer.set(samples.subarray(sampleIndex, sampleIndex + lengthToCopy), this.inputBufferIndex);
-      sampleIndex += lengthToCopy;
       this.inputBufferIndex += lengthToCopy;
 
-      if (this.inputBufferIndex === this.mInputBuffer.length) {
+      // When mInputBuffer is fill, then encode.
+      if (this.inputBufferIndex >= this.mInputBuffer.length) {
         // Resampling
         let mInputLength = new WasmUint32(this.inputSamplesPerChannel);
         let mOutputLength = new WasmUint32(this.outputSamplePerChannel);
-        this._speex_resampler_process_interleaved_float(this.resampler, this.mInputBuffer.pointer, mInputLength.pointer, this.mResampledBuffer.pointer, mOutputLength.pointer);
+        let err = this._speex_resampler_process_interleaved_float(this.resampler, this.mInputBuffer.pointer, mInputLength.pointer, this.mResampledBuffer.pointer, mOutputLength.pointer);
         mInputLength.free();
         mOutputLength.free();
+        if (err !== RESAMPLER_ERR_SUCCESS) {
+          throw new Error('Resampling error.');
+        }
         // Encoding
         let packetLength = this._opus_encode_float(this.encoder, this.mResampledBuffer.pointer, this.outputSamplePerChannel, this.mOutputBuffer.pointer, this.mOutputBuffer.length);
-        this.segmentPacket(packetLength);
+        if (packetLength < 0) {
+          throw new Error('Opus encoding error.');
+        }
+        this.OggSegmentPacket(packetLength);
         this.inputBufferIndex = 0;
       }
+      sampleIndex += lengthToCopy;
     }
 
     this.buffersInPage++;
@@ -255,6 +277,7 @@ class _OggOpusEncoder {
   encodeFinalFrame () {
     const {channelCount} = this.config;
 
+    // Fill zero to buffers, size is the same as re rest of inputBuffer.
     let finalFrameBuffers = [];
     for (let i = 0; i < channelCount; ++i) {
       finalFrameBuffers.push(new Float32Array(BUFFER_LENGTH - (this.inputBufferIndex / channelCount)));
@@ -262,6 +285,17 @@ class _OggOpusEncoder {
     this.encode(finalFrameBuffers);
     this.headerType += 4;
     this.OggGeneratePage();
+  }
+
+  /**
+   * Free up memory before close the web worker.
+   */
+  close () {
+    this.mInputBuffer.free();
+    this.mResampledBuffer.free();
+    this.mOutputBuffer.free();
+    this._opus_encoder_destroy(this.encoder);
+    this._speex_resampler_destroy(this.resampler);
   }
 
   /**
@@ -285,35 +319,22 @@ class _OggOpusEncoder {
     return this.interleavedBuffers;
   }
 
-  segmentPacket (packetLength) {
-    var packetIndex = 0;
-
-    while (packetLength >= 0) {
-      if (this.segmentTableIndex === 255) {
-        this.OggGeneratePage();
-        this.headerType = 1;
-      }
-
-      var segmentLength = Math.min(packetLength, 255);
-      this.segmentTable[ this.segmentTableIndex++ ] = segmentLength;
-      this.segmentData.set(this.mOutputBuffer.subarray(packetIndex, packetIndex + segmentLength), this.segmentDataIndex);
-      this.segmentDataIndex += segmentLength;
-      packetIndex += segmentLength;
-      packetLength -= 255;
-    }
-
-    this.granulePosition += (48 * OPUS_FRAME_SIZE);
-    if (this.segmentTableIndex === 255) {
-      this.OggGeneratePage();
-      this.headerType = 0;
-    }
-  }
-
   OpusInitCodec (outRate, chCount, bitRate = undefined) {
     let mErr = new WasmUint32(undefined);
     this.encoder = this._opus_encoder_create(outRate, chCount, OPUS_APPLICATION, mErr.pointer);
+    let err = mErr.value;
     mErr.free();
-
+    if (err !== OPUS_OK) {
+      throw new Error('Opus encodor initialization failed.');
+    }
+    /** Configures the bitrate in the encoder.
+     * Rates from 500 to 512000 bits per second are meaningful, as well as the
+     * special values #OPUS_AUTO (-1000) and #OPUS_BITRATE_MAX (-1).
+     * The value #OPUS_BITRATE_MAX can be used to cause the codec to use as much
+     * rate as it can, which is useful for controlling the rate by adjusting the
+     * output buffer size. The default is determined based on the number of
+     * channels and the input sampling rate.
+     */
     if (bitRate) {
       this.OpusSetOpusControl(OPUS_SET_BITRATE_REQUEST, bitRate);
     }
@@ -328,7 +349,11 @@ class _OggOpusEncoder {
   SpeexInitResampler (inputRate, outputRate, chCount) {
     let mErr = new WasmUint32(undefined);
     this.resampler = this._speex_resampler_init(chCount, inputRate, outputRate, SPEEX_RESAMPLE_QUALITY, mErr.pointer);
+    let err = mErr.value;
     mErr.free();
+    if (err !== RESAMPLER_ERR_SUCCESS) {
+      throw new Error('Initializing resampler failed.');
+    }
   }
 
   OggInitChecksumTable () {
@@ -371,15 +396,24 @@ class _OggOpusEncoder {
      *    |                                                               |
      *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
      */
-
     let view = new DataView(this.segmentData.buffer);
-    writeString(view, 0, 'OpusHead'); // Magic Signature 'OpusHead'
-    view.setUint8(8, 1, true); // Version
-    view.setUint8(9, chCount, true); // Channel count
-    view.setUint16(10, 3840, true); // pre-skip (80ms)
-    view.setUint32(12, inputRate, true); // original sample rate
-    view.setUint16(16, 0, true); // output gain
-    view.setUint8(18, 0, true); // Channel Mapping Family 0: mono or stereo (left, right).
+    // Magic Signature 'OpusHead'
+    writeString(view, 0, 'OpusHead');
+    // The version must always be 1 (8 bits, unsigned).
+    view.setUint8(8, 1, true);
+    // Number of output channels (8 bits, unsigned).
+    view.setUint8(9, chCount, true);
+    // Number of samples (at 48 kHz) to discard from the decoder output when
+    // starting playback (16 bits, unsigned, little endian).
+    // Currently pre-skip is 80ms.
+    view.setUint16(10, 3840, true);
+    // The sampling rate of input source (32 bits, unsigned, little endian).
+    view.setUint32(12, inputRate, true);
+    // Output gain, an encoder should set this field to zero (16 bits, signed,
+    // little endian).
+    view.setUint16(16, 0, true);
+    // Channel Mapping Family 0: mono or stereo (left, right). (8 bits, unsigned).
+    view.setUint8(18, 0, true);
     this.segmentTableIndex = 1;
     this.segmentDataIndex = this.segmentTable[0] = 19;
     this.headerType = 2;
@@ -414,8 +448,8 @@ class _OggOpusEncoder {
      *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
      */
     let view = new DataView(this.segmentData.buffer);
-    // Magic
-    writeString(view, 0, 'OpusTags'); // Magic Signature 'OpusTags'
+    // Magic Signature 'OpusTags'
+    writeString(view, 0, 'OpusTags');
     // Vendor String
     let vendor = 'Opus-Media-Recorder';
     view.setUint32(8, vendor.length, true); // Vendor String Length
@@ -489,6 +523,30 @@ class _OggOpusEncoder {
       this.lastPositiveGranulePosition = granulePosition;
     }
   }
+
+  OggSegmentPacket (packetLength) {
+    var packetIndex = 0;
+
+    while (packetLength >= 0) {
+      if (this.segmentTableIndex === 255) {
+        this.OggGeneratePage();
+        this.headerType = 1;
+      }
+
+      var segmentLength = Math.min(packetLength, 255);
+      this.segmentTable[ this.segmentTableIndex++ ] = segmentLength;
+      this.segmentData.set(this.mOutputBuffer.subarray(packetIndex, packetIndex + segmentLength), this.segmentDataIndex);
+      this.segmentDataIndex += segmentLength;
+      packetIndex += segmentLength;
+      packetLength -= 255;
+    }
+
+    this.granulePosition += (48 * OPUS_FRAME_SIZE);
+    if (this.segmentTableIndex === 255) {
+      this.OggGeneratePage();
+      this.headerType = 0;
+    }
+  }
 }
 
 var oggEncoder;
@@ -530,6 +588,8 @@ WASM.onRuntimeInitialized = function () {
         oggEncoder.encodedBuffers = [];
 
         if (command === 'done') {
+          // Free memory and close
+          oggEncoder.close();
           self.close();
         }
         break;

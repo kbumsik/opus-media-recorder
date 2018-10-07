@@ -7,8 +7,10 @@ DOCS_DIR = ./docs
 # For Emscripten
 EMCC_OPTS=-g3 -O3 --llvm-lto 1 -s NO_DYNAMIC_EXECUTION=1 -s NO_FILESYSTEM=1
 DEFAULT_EXPORTS:='_malloc','_free'
-OPUS_EXPORTS:='_opus_encoder_create','_opus_encode_float','_opus_encoder_ctl'
-SPEEX_EXPORTS:='_speex_resampler_init','_speex_resampler_process_interleaved_float','_speex_resampler_destroy'
+OPUS_EXPORTS:='_opus_encoder_create','_opus_encode_float','_opus_encoder_ctl', \
+				'_opus_encoder_destroy'
+SPEEX_EXPORTS:='_speex_resampler_init','_speex_resampler_process_interleaved_float', \
+				'_speex_resampler_destroy'
 
 # For JavaScript build
 NPM_BUILD_CMD = build
