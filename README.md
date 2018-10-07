@@ -1,5 +1,7 @@
 # opus-media-recorder
 
+[Try it!](https://kbumsik.io/opus-media-recorder/)
+
 `opus-media-recorder` is a [MediaRecorder API](https://w3c.github.io/mediacapture-record/#mediarecorder-api) polyfill written in ES6 and WebAssembly. It aims a cross-browser Opus codec support with various audio formats such as Ogg and Webm. `opus-media-recorder` can be used as a ployfill, or it can replace the built-in MediaRecorder since `opus-media-recorder` supports more MIME types.
 
 `opus-media-recorder` uses WebAssembly compiled from popular libraries (e.g libopus, libogg, and speexdsp) to ensure performance and standards-compliance.
@@ -131,6 +133,6 @@ Browsers with issues:
 
 3. `make all` to build. `PRODUCTION=1 make all` to build for production.
 
-4. `npm run start` to run a test web server locally.
+4. `make run` to run a test web server locally. Default URL is `https://localhost:9000` (It has to be HTTPS).
 
-5. `make clean` to clean up files.
+5. `make clean` to clean up build files.

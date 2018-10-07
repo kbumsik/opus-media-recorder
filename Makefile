@@ -35,7 +35,7 @@ OUTPUT_FILES = MediaRecorder.js OggOpusWorker.js OggOpusWorker.wasm WaveWorker.j
 # Assets in docs folder
 DOCS_ASSETS = $(addprefix $(DOCS_DIR)/assets/, $(OUTPUT_FILES))
 
-.PHONY: all clean
+.PHONY: all run clean
 
 all: $(OGG_OPUS_WORKER) $(DOCS_ASSETS)
 
@@ -43,7 +43,7 @@ $(DIST_DIR):
 	mkdir $@
 
 # Building libraries
-$(BUILD_DIR)/%.js: $(SRC_DIR)/%.js
+$(BUILD_DIR)/%.js $(DIST_DIR)/%.js: $(SRC_DIR)/%.js
 	npm run $(NPM_BUILD_CMD)
 
 $(BUILD_DIR)/%.a:
@@ -55,9 +55,12 @@ $(OGG_OPUS_WORKER): $(OGG_OPUS_JS) $(OPUS_OBJ) $(OGG_OBJ) $(SPEEX_OBJ) $(DIST_DI
 		--pre-js $< $(OPUS_OBJ) $(SPEEX_OBJ)
 
 $(DOCS_DIR)/assets/%: $(DIST_DIR)/%
-	cp -f $< $@
+	cp $< $@
 
 # etc.
+run:
+	npm run start
+
 clean:
 	make -C $(LIB_DIR) clean
 	-rm -rf $(BUILD_DIR) $(DIST_DIR)
