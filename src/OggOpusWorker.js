@@ -186,15 +186,17 @@ class _OggOpusEncoder {
     };
     this.encodedBuffers = [];
 
+    // Functions imported from WASM
     this._opus_encoder_create = WASM._opus_encoder_create;
     this._opus_encoder_ctl = WASM._opus_encoder_ctl;
     this._speex_resampler_process_interleaved_float = WASM._speex_resampler_process_interleaved_float;
     this._speex_resampler_init = WASM._speex_resampler_init;
     this._opus_encode_float = WASM._opus_encode_float;
 
+    // Attributes for OGG packing
     this.pageIndex = 0;
     this.granulePosition = 0;
-    this.segmentData = new Uint8Array(65025); // Maximum length of oggOpus data
+    this.segmentData = new Uint8Array(255 * 255); // Maximum length of Opus data in a page
     this.segmentDataIndex = 0;
     this.segmentTable = new Uint8Array(255); // Maximum data segments
     this.segmentTableIndex = 0;
@@ -206,6 +208,16 @@ class _OggOpusEncoder {
     this.OggGenerateIdPage(inputSampleRate, channelCount);
     this.OggGenerateCommentPage();
 
+    this.inputSamplesPerChannel = inputSampleRate * OPUS_FRAME_SIZE / 1000;
+    this.outputSamplePerChannel = OPUS_OUTPUT_SAMPLE_RATE * OPUS_FRAME_SIZE / 1000;
+
+    // Initialize all buffers
+    //  |input buffer| =={reampler}=> |resampled buffer| =={encoder}=> |output buffer|
+    this.inputBufferIndex = 0;
+    this.mInputBuffer = new WasmFloat32Buffer(this.inputSamplesPerChannel * channelCount);
+    this.mResampledBuffer = new WasmFloat32Buffer(this.outputSamplePerChannel * channelCount);
+    this.mOutputBuffer = new WasmUint8Buffer(OPUS_OUTPUT_MAX_LENGTH);
+
     // TODO: Figure out how to delete this thing.
     this.interleavedBuffers = (channelCount !== 1) ? new Float32Array(BUFFER_LENGTH * channelCount) : undefined;
   }
@@ -215,16 +227,22 @@ class _OggOpusEncoder {
     let sampleIndex = 0;
 
     while (sampleIndex < samples.length) {
-      let lengthToCopy = Math.min(this.mInputBuffer.length - this.resampleBufferIndex, samples.length - sampleIndex);
-      this.mInputBuffer.set(samples.subarray(sampleIndex, sampleIndex + lengthToCopy), this.resampleBufferIndex);
+      let lengthToCopy = Math.min(this.mInputBuffer.length - this.inputBufferIndex, samples.length - sampleIndex);
+      this.mInputBuffer.set(samples.subarray(sampleIndex, sampleIndex + lengthToCopy), this.inputBufferIndex);
       sampleIndex += lengthToCopy;
-      this.resampleBufferIndex += lengthToCopy;
+      this.inputBufferIndex += lengthToCopy;
 
-      if (this.resampleBufferIndex === this.mInputBuffer.length) {
-        this._speex_resampler_process_interleaved_float(this.resampler, this.mInputBuffer.pointer, this.mInputSamplesPerChannel.pointer, this.mResampledBuffer.pointer, this.mOutputSamplePerChannel.pointer);
-        let packetLength = this._opus_encode_float(this.encoder, this.mResampledBuffer.pointer, this.mOutputSamplePerChannel.value, this.mOutputBuffer.pointer, this.mOutputBuffer.length);
+      if (this.inputBufferIndex === this.mInputBuffer.length) {
+        // Resampling
+        let mInputLength = new WasmUint32(this.inputSamplesPerChannel);
+        let mOutputLength = new WasmUint32(this.outputSamplePerChannel);
+        this._speex_resampler_process_interleaved_float(this.resampler, this.mInputBuffer.pointer, mInputLength.pointer, this.mResampledBuffer.pointer, mOutputLength.pointer);
+        mInputLength.free();
+        mOutputLength.free();
+        // Encoding
+        let packetLength = this._opus_encode_float(this.encoder, this.mResampledBuffer.pointer, this.outputSamplePerChannel, this.mOutputBuffer.pointer, this.mOutputBuffer.length);
         this.segmentPacket(packetLength);
-        this.resampleBufferIndex = 0;
+        this.inputBufferIndex = 0;
       }
     }
 
@@ -239,7 +257,7 @@ class _OggOpusEncoder {
 
     let finalFrameBuffers = [];
     for (let i = 0; i < channelCount; ++i) {
-      finalFrameBuffers.push(new Float32Array(BUFFER_LENGTH - (this.resampleBufferIndex / channelCount)));
+      finalFrameBuffers.push(new Float32Array(BUFFER_LENGTH - (this.inputBufferIndex / channelCount)));
     }
     this.encode(finalFrameBuffers);
     this.headerType += 4;
@@ -299,16 +317,6 @@ class _OggOpusEncoder {
     if (bitRate) {
       this.OpusSetOpusControl(OPUS_SET_BITRATE_REQUEST, bitRate);
     }
-
-    let mOutputSamplePerChannel = new WasmUint32(outRate * OPUS_FRAME_SIZE / 1000);
-
-    let mResampledBuffer = new WasmFloat32Buffer(mOutputSamplePerChannel.value * chCount);
-    let mOutputBuffer = new WasmUint8Buffer(OPUS_OUTPUT_MAX_LENGTH);
-
-    this.mOutputSamplePerChannel = mOutputSamplePerChannel;
-
-    this.mResampledBuffer = mResampledBuffer;
-    this.mOutputBuffer = mOutputBuffer;
   }
 
   OpusSetOpusControl (request, vaArg) {
@@ -321,14 +329,6 @@ class _OggOpusEncoder {
     let mErr = new WasmUint32(undefined);
     this.resampler = this._speex_resampler_init(chCount, inputRate, outputRate, SPEEX_RESAMPLE_QUALITY, mErr.pointer);
     mErr.free();
-
-    let resampleBufferIndex = 0;
-    let mInputSamplesPerChannel = new WasmUint32(inputRate * OPUS_FRAME_SIZE / 1000);
-    let mInputBuffer = new WasmFloat32Buffer(mInputSamplesPerChannel.value * chCount);
-
-    this.resampleBufferIndex = resampleBufferIndex;
-    this.mInputSamplesPerChannel = mInputSamplesPerChannel;
-    this.mInputBuffer = mInputBuffer;
   }
 
   OggInitChecksumTable () {
