@@ -26,11 +26,13 @@
 
 import { writeString } from './commonFunctions.js';
 
-const OPUS_APPLICATION = 2049; /** 2048 = Voice (Lower fidelity)
-                                        *  2049 = Full Band Audio (Highest fidelity)
-                                        *  2051 = Restricted Low Delay (Lowest latency) */
+const OPUS_APPLICATION = 2049; /** Defined in opus_defines.h
+                                *  2048: OPUS_APPLICATION_VOIP = Voice (Lower fidelity)
+                                *  2049: OPUS_APPLICATION_AUDIO = Full Band Audio (Highest fidelity)
+                                *  2051: OPUS_APPLICATION_RESTRICTED_LOWDELAY = Restricted Low Delay (Lowest latency) */
 const OPUS_OUTPUT_SAMPLE_RATE = 48000; // Desired encoding sample rate. Audio will be resampled
 const OPUS_FRAME_SIZE = 20; // Specified in ms.
+const OPUS_SET_BITRATE_REQUEST = 4002; // Defined in opus_defines.h
 
 const SPEEX_RESAMPLE_QUALITY = 6; // Value between 0 and 10 inclusive. 10 being highest quality.
 
@@ -45,6 +47,64 @@ const BUFFER_LENGTH = 4096;
  */
 self['Module'] = {};
 const WASM = self['Module'];
+
+/**
+ * C malloc allocated signed int32 object
+ */
+class WasmInt32 {
+  /**
+   * Allocate and assign number
+   * @param {number|undefined} value - If undefined the value is not assigned to the memory.
+   */
+  constructor (value) {
+    this._pointer = WASM._malloc(4);
+    if (typeof value !== 'undefined') {
+      WASM.HEAP32[this._pointer >> 2] = value;
+    }
+  }
+  /**
+   * Free memory
+   */
+  free () {
+    WASM._free(this.pointer);
+  }
+
+  get pointer () {
+    return this._pointer;
+  }
+
+  get value () {
+    return WASM.HEAP32[this.pointer >> 2];
+  }
+}
+
+/**
+ * C malloc allocated unsigned int32 object
+ */
+class WasmUint32 {
+  /**
+   * Allocate and assign number
+   * @param {number|undefined} value - If undefined the value is not assigned to the memory.
+   */
+  constructor (value) {
+    this._pointer = WASM._malloc(4);
+    if (typeof value !== 'undefined') {
+      WASM.HEAPU32[this._pointer >> 2] = value;
+    }
+  }
+
+  free () {
+    WASM._free(this.pointer);
+  }
+
+  get pointer () {
+    return this._pointer;
+  }
+
+  get value () {
+    return WASM.HEAPU32[this.pointer >> 2];
+  }
+}
 
 class _OggOpusEncoder {
   constructor (inputSampleRate, channelCount) {
@@ -62,7 +122,6 @@ class _OggOpusEncoder {
     this._free = WASM._free;
     this._malloc = WASM._malloc;
     this._HEAPU8 = WASM.HEAPU8;
-    this._HEAP32 = WASM.HEAP32;
     this._HEAPF32 = WASM.HEAPF32;
 
     this.pageIndex = 0;
@@ -94,8 +153,8 @@ class _OggOpusEncoder {
       this.resampleBufferIndex += lengthToCopy;
 
       if (this.resampleBufferIndex === this.resampleBufferLength) {
-        this._speex_resampler_process_interleaved_float(this.resampler, this.resampleBufferPointer, this.resampleSamplesPerChannelPointer, this.encoderBufferPointer, this.encoderSamplesPerChannelPointer);
-        var packetLength = this._opus_encode_float(this.encoder, this.encoderBufferPointer, this.encoderSamplesPerChannel, this.encoderOutputPointer, this.encoderOutputMaxLength);
+        this._speex_resampler_process_interleaved_float(this.resampler, this.resampleBufferPointer, this.mInputSamplesPerChannel.pointer, this.encoderBufferPointer, this.mOutputSamplePerChannel.pointer);
+        var packetLength = this._opus_encode_float(this.encoder, this.encoderBufferPointer, this.mOutputSamplePerChannel.value, this.encoderOutputPointer, this.encoderOutputMaxLength);
         this.segmentPacket(packetLength);
         this.resampleBufferIndex = 0;
       }
@@ -165,19 +224,17 @@ class _OggOpusEncoder {
   }
 
   OpusInitCodec (outRate, chCount, bitRate = undefined) {
-    let errLocation = this._malloc(4);
-    this.encoder = this._opus_encoder_create(outRate, chCount, OPUS_APPLICATION, errLocation);
-    this._free(errLocation);
+    let mErr = new WasmUint32(undefined);
+    this.encoder = this._opus_encoder_create(outRate, chCount, OPUS_APPLICATION, mErr.pointer);
+    mErr.free();
 
     if (bitRate) {
-      this.OpusSetOpusControl(4002, bitRate);
+      this.OpusSetOpusControl(OPUS_SET_BITRATE_REQUEST, bitRate);
     }
 
-    let encoderSamplesPerChannel = outRate * OPUS_FRAME_SIZE / 1000;
-    let encoderSamplesPerChannelPointer = this._malloc(4);
-    this._HEAP32[ encoderSamplesPerChannelPointer >> 2 ] = encoderSamplesPerChannel;
+    let mOutputSamplePerChannel = new WasmUint32(outRate * OPUS_FRAME_SIZE / 1000);
 
-    let encoderBufferLength = encoderSamplesPerChannel * chCount;
+    let encoderBufferLength = mOutputSamplePerChannel.value * chCount;
     let encoderBufferPointer = this._malloc(encoderBufferLength * 4); // 4 bytes per sample
     let encoderBuffer = this._HEAPF32.subarray(encoderBufferPointer >> 2, (encoderBufferPointer >> 2) + encoderBufferLength);
 
@@ -185,8 +242,8 @@ class _OggOpusEncoder {
     let encoderOutputPointer = this._malloc(encoderOutputMaxLength);
     let encoderOutputBuffer = this._HEAPU8.subarray(encoderOutputPointer, encoderOutputPointer + encoderOutputMaxLength);
 
-    this.encoderSamplesPerChannel = encoderSamplesPerChannel;
-    this.encoderSamplesPerChannelPointer = encoderSamplesPerChannelPointer;
+    this.mOutputSamplePerChannel = mOutputSamplePerChannel;
+
     this.encoderBufferLength = encoderBufferLength;
     this.encoderBufferPointer = encoderBufferPointer;
     this.encoderBuffer = encoderBuffer;
@@ -195,30 +252,26 @@ class _OggOpusEncoder {
     this.encoderOutputBuffer = encoderOutputBuffer;
   }
 
-  OpusSetOpusControl (control, value) {
-    let location = this._malloc(4);
-    this._HEAP32[ location >> 2 ] = value;
-    this._opus_encoder_ctl(this.encoder, control, location);
-    this._free(location);
+  OpusSetOpusControl (request, vaArg) {
+    let value = new WasmInt32(vaArg);
+    this._opus_encoder_ctl(this.encoder, request, value.pointer);
+    value.free();
   }
 
   SpeexInitResampler (inputRate, outputRate, chCount) {
-    let errLocation = this._malloc(4);
-    this.resampler = this._speex_resampler_init(chCount, inputRate, outputRate, SPEEX_RESAMPLE_QUALITY, errLocation);
-    this._free(errLocation);
+    let mErr = new WasmUint32(undefined);
+    this.resampler = this._speex_resampler_init(chCount, inputRate, outputRate, SPEEX_RESAMPLE_QUALITY, mErr.pointer);
+    mErr.free();
 
     let resampleBufferIndex = 0;
-    let resampleSamplesPerChannel = inputRate * OPUS_FRAME_SIZE / 1000;
-    let resampleSamplesPerChannelPointer = this._malloc(4);
-    this._HEAP32[ resampleSamplesPerChannelPointer >> 2 ] = resampleSamplesPerChannel;
+    let mInputSamplesPerChannel = new WasmUint32(inputRate * OPUS_FRAME_SIZE / 1000);
 
-    let resampleBufferLength = resampleSamplesPerChannel * chCount;
+    let resampleBufferLength = mInputSamplesPerChannel.value * chCount;
     let resampleBufferPointer = this._malloc(resampleBufferLength * 4); // 4 bytes per sample
     let resampleBuffer = this._HEAPF32.subarray(resampleBufferPointer >> 2, (resampleBufferPointer >> 2) + resampleBufferLength);
 
     this.resampleBufferIndex = resampleBufferIndex;
-    this.resampleSamplesPerChannel = resampleSamplesPerChannel;
-    this.resampleSamplesPerChannelPointer = resampleSamplesPerChannelPointer;
+    this.mInputSamplesPerChannel = mInputSamplesPerChannel;
     this.resampleBufferLength = resampleBufferLength;
     this.resampleBufferPointer = resampleBufferPointer;
     this.resampleBuffer = resampleBuffer;
