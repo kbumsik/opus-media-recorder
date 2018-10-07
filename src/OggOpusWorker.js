@@ -26,24 +26,25 @@
 
 import { writeString } from './commonFunctions.js';
 
+const OPUS_APPLICATION = 2049; /** 2048 = Voice (Lower fidelity)
+                                        *  2049 = Full Band Audio (Highest fidelity)
+                                        *  2051 = Restricted Low Delay (Lowest latency) */
+const OPUS_OUTPUT_SAMPLE_RATE = 48000; // Desired encoding sample rate. Audio will be resampled
+const OPUS_FRAME_SIZE = 20; // Specified in ms.
+
+const SPEEX_RESAMPLE_QUALITY = 6; // Value between 0 and 10 inclusive. 10 being highest quality.
+
+const OGG_MAX_BUFFERS_PER_PAGE = 10; // Tradeoff latency with overhead
+const OGG_SERIAL = Math.floor(Math.random() * 0xFFFFFFFF); // Bitstream serial number, any random 32-bit number
+
+const BUFFER_LENGTH = 4096;
+
 class _OggOpusEncoder {
-  constructor (sampleRate, channelCount, moduleRef) {
-    this.config = Object.assign({
-      bufferLength: 4096, // Define size of incoming buffer
-      encoderApplication: 2049, /** 2048 = Voice (Lower fidelity)
-                                 *  2049 = Full Band Audio (Highest fidelity)
-                                 *  2051 = Restricted Low Delay (Lowest latency) */
-      encoderFrameSize: 20, // Specified in ms.
-      encoderSampleRate: 48000, // Desired encoding sample rate. Audio will be resampled
-      maxBuffersPerPage: 10, // Tradeoff latency with overhead
-      numberOfChannels: 1,
-      originalSampleRate: 44100,
-      resampleQuality: 6, // Value between 0 and 10 inclusive. 10 being highest quality.
-      serial: Math.floor(Math.random() * 4294967296)
-    }, {
-      numberOfChannels: channelCount,
-      originalSampleRate: sampleRate
-    });
+  constructor (inputSampleRate, channelCount, moduleRef) {
+    this.config = {
+      inputSampleRate, // Usually 44100Hz or 48000Hz
+      channelCount
+    };
     this.encodedBuffers = [];
 
     this._opus_encoder_create = moduleRef._opus_encoder_create;
@@ -66,21 +67,16 @@ class _OggOpusEncoder {
     this.buffersInPage = 0;
 
     this.OggInitChecksumTable();
-    this.OpusInitCodec();
-    this.SpeexInitResampler();
-    this.OggGenerateIdPage();
+    this.OpusInitCodec(OPUS_OUTPUT_SAMPLE_RATE, channelCount, undefined);
+    this.SpeexInitResampler(inputSampleRate, OPUS_OUTPUT_SAMPLE_RATE, channelCount);
+    this.OggGenerateIdPage(inputSampleRate, channelCount);
     this.OggGenerateCommentPage();
 
-    if (this.config.numberOfChannels === 1) {
-      // TODO: Overriding Interleave()???
-      this.interleave = function (buffers) { return buffers[0]; };
-    } else {
-      this.interleavedBuffers = new Float32Array(this.config.bufferLength * this.config.numberOfChannels);
-    }
+    // TODO: Figure out how to delete this thing.
+    this.interleavedBuffers = (channelCount !== 1) ? new Float32Array(BUFFER_LENGTH * channelCount) : undefined;
   }
 
   encode (buffers, length, duration) {
-    // TODO: what interleave does?
     let samples = this.interleave(buffers);
     let sampleIndex = 0;
 
@@ -99,25 +95,39 @@ class _OggOpusEncoder {
     }
 
     this.buffersInPage++;
-    if (this.buffersInPage >= this.config.maxBuffersPerPage) {
+    if (this.buffersInPage >= OGG_MAX_BUFFERS_PER_PAGE) {
       this.OggGeneratePage();
     }
   }
 
   encodeFinalFrame () {
+    const {channelCount} = this.config;
+
     let finalFrameBuffers = [];
-    for (let i = 0; i < this.config.numberOfChannels; ++i) {
-      finalFrameBuffers.push(new Float32Array(this.config.bufferLength - (this.resampleBufferIndex / this.config.numberOfChannels)));
+    for (let i = 0; i < channelCount; ++i) {
+      finalFrameBuffers.push(new Float32Array(BUFFER_LENGTH - (this.resampleBufferIndex / channelCount)));
     }
     this.encode(finalFrameBuffers);
     this.headerType += 4;
     this.OggGeneratePage();
   }
 
-  interleave (buffers) {
-    for (let i = 0; i < this.config.bufferLength; i++) {
-      for (let channel = 0; channel < this.config.numberOfChannels; channel++) {
-        this.interleavedBuffers[ i * this.config.numberOfChannels + channel ] = buffers[ channel ][ i ];
+  /**
+   * Interleave the channel buffer.
+   * @param {Float32Array[]} channelBuffers - An array of buffers to interleave.
+   */
+  interleave (channelBuffers) {
+    const chCount = channelBuffers.length;
+
+    // if it only has one channel, no interleave needed.
+    if (chCount === 1) {
+      return channelBuffers[0];
+    }
+    // Format: | ch0 | ch1 | ch0 | ch1 | ch0 | ch1 | ch0 | ch1 | ...
+    for (let ch = 0; ch < chCount; ch++) {
+      let buffer = channelBuffers[ch];
+      for (let i = 0; i < buffer.length; i++) {
+        this.interleavedBuffers[i * chCount + ch] = buffer[i];
       }
     }
     return this.interleavedBuffers;
@@ -140,34 +150,27 @@ class _OggOpusEncoder {
       packetLength -= 255;
     }
 
-    this.granulePosition += (48 * this.config.encoderFrameSize);
+    this.granulePosition += (48 * OPUS_FRAME_SIZE);
     if (this.segmentTableIndex === 255) {
       this.OggGeneratePage();
       this.headerType = 0;
     }
   }
 
-  OpusInitCodec () {
-    const {encoderSampleRate, numberOfChannels, encoderApplication,
-      encoderBitRate, encoderComplexity, encoderFrameSize} = this.config;
-
-    var errLocation = this._malloc(4);
-    this.encoder = this._opus_encoder_create(encoderSampleRate, numberOfChannels, encoderApplication, errLocation);
+  OpusInitCodec (outRate, chCount, bitRate = undefined) {
+    let errLocation = this._malloc(4);
+    this.encoder = this._opus_encoder_create(outRate, chCount, OPUS_APPLICATION, errLocation);
     this._free(errLocation);
 
-    if (encoderBitRate) {
-      this.OpusSetOpusControl(4002, encoderBitRate);
+    if (bitRate) {
+      this.OpusSetOpusControl(4002, bitRate);
     }
 
-    if (encoderComplexity) {
-      this.OpusSetOpusControl(4010, encoderComplexity);
-    }
-
-    let encoderSamplesPerChannel = encoderSampleRate * encoderFrameSize / 1000;
+    let encoderSamplesPerChannel = outRate * OPUS_FRAME_SIZE / 1000;
     let encoderSamplesPerChannelPointer = this._malloc(4);
     this._HEAP32[ encoderSamplesPerChannelPointer >> 2 ] = encoderSamplesPerChannel;
 
-    let encoderBufferLength = encoderSamplesPerChannel * numberOfChannels;
+    let encoderBufferLength = encoderSamplesPerChannel * chCount;
     let encoderBufferPointer = this._malloc(encoderBufferLength * 4); // 4 bytes per sample
     let encoderBuffer = this._HEAPF32.subarray(encoderBufferPointer >> 2, (encoderBufferPointer >> 2) + encoderBufferLength);
 
@@ -192,20 +195,17 @@ class _OggOpusEncoder {
     this._free(location);
   }
 
-  SpeexInitResampler () {
-    const {numberOfChannels, originalSampleRate, encoderSampleRate,
-      resampleQuality, encoderFrameSize} = this.config;
+  SpeexInitResampler (inputRate, outputRate, chCount) {
     let errLocation = this._malloc(4);
-
-    this.resampler = this._speex_resampler_init(numberOfChannels, originalSampleRate, encoderSampleRate, resampleQuality, errLocation);
+    this.resampler = this._speex_resampler_init(chCount, inputRate, outputRate, SPEEX_RESAMPLE_QUALITY, errLocation);
     this._free(errLocation);
 
     let resampleBufferIndex = 0;
-    let resampleSamplesPerChannel = originalSampleRate * encoderFrameSize / 1000;
+    let resampleSamplesPerChannel = inputRate * OPUS_FRAME_SIZE / 1000;
     let resampleSamplesPerChannelPointer = this._malloc(4);
     this._HEAP32[ resampleSamplesPerChannelPointer >> 2 ] = resampleSamplesPerChannel;
 
-    let resampleBufferLength = resampleSamplesPerChannel * numberOfChannels;
+    let resampleBufferLength = resampleSamplesPerChannel * chCount;
     let resampleBufferPointer = this._malloc(resampleBufferLength * 4); // 4 bytes per sample
     let resampleBuffer = this._HEAPF32.subarray(resampleBufferPointer >> 2, (resampleBufferPointer >> 2) + resampleBufferLength);
 
@@ -236,7 +236,7 @@ class _OggOpusEncoder {
     return checksum >>> 0;
   }
 
-  OggGenerateIdPage () {
+  OggGenerateIdPage (inputRate, chCount) {
     /**
      * Identification header format:
      *     0                   1                   2                   3
@@ -257,15 +257,13 @@ class _OggOpusEncoder {
      *    |                                                               |
      *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
      */
-    const {numberOfChannels, originalSampleRateOverride,
-      originalSampleRate} = this.config;
 
     let view = new DataView(this.segmentData.buffer);
     writeString(view, 0, 'OpusHead'); // Magic Signature 'OpusHead'
     view.setUint8(8, 1, true); // Version
-    view.setUint8(9, numberOfChannels, true); // Channel count
+    view.setUint8(9, chCount, true); // Channel count
     view.setUint16(10, 3840, true); // pre-skip (80ms)
-    view.setUint32(12, originalSampleRateOverride || originalSampleRate, true); // original sample rate
+    view.setUint32(12, inputRate, true); // original sample rate
     view.setUint16(16, 0, true); // output gain
     view.setUint8(18, 0, true); // Channel Mapping Family 0: mono or stereo (left, right).
     this.segmentTableIndex = 1;
@@ -360,7 +358,7 @@ class _OggOpusEncoder {
       view.setInt32(10, Math.floor(granulePosition / 4294967296), true);
     }
 
-    view.setUint32(14, this.config.serial, true); // Bitstream serial number
+    view.setUint32(14, OGG_SERIAL, true); // Bitstream serial number
     view.setUint32(18, this.pageIndex, true); // Page sequence number
     this.pageIndex += 1;
     view.setUint8(26, this.segmentTableIndex, true); // Number of segments in page.
@@ -402,7 +400,7 @@ self['Module'].onRuntimeInitialized = function () {
         const { channelBuffers, length, duration } = e.data;
         // On Chrome, Float32Array doesn't recognize its buffer after transferred.
         // So re-create Float32Array right after a web worker received it.
-        for (let i = 0; i < oggEncoder.config.numberOfChannels; i++) {
+        for (let i = 0; i < oggEncoder.config.channelCount; i++) {
           channelBuffers[i] = new Float32Array(channelBuffers[i].buffer);
         }
 
