@@ -24,7 +24,8 @@
 
 'use strict';
 
-import { writeString } from './commonFunctions.js';
+import { writeString, setWASM, WasmInt32, WasmUint32, WasmUint8Buffer,
+  WasmFloat32Buffer } from './commonFunctions.js';
 
 /**
  * Configuration
@@ -59,135 +60,6 @@ const RESAMPLER_ERR_SUCCESS = 0;
  */
 self['Module'] = {};
 const WASM = self['Module'];
-
-/**
- * C malloc allocated signed int32 object
- */
-class WasmInt32 {
-  /**
-   * Allocate and assign number
-   * @param {number|undefined} value - If undefined the value is not assigned to the memory.
-   */
-  constructor (value) {
-    this._pointer = WASM._malloc(4);
-    if (typeof value !== 'undefined') {
-      WASM.HEAP32[this._pointer >> 2] = value;
-    }
-  }
-  /**
-   * Free memory
-   */
-  free () {
-    WASM._free(this.pointer);
-  }
-
-  get pointer () {
-    return this._pointer;
-  }
-
-  get value () {
-    return WASM.HEAP32[this.pointer >> 2];
-  }
-}
-
-/**
- * C malloc allocated unsigned int32 object
- */
-class WasmUint32 {
-  /**
-   * Allocate and assign number
-   * @param {number|undefined} value - If undefined the value is not assigned to the memory.
-   */
-  constructor (value) {
-    this._pointer = WASM._malloc(4);
-    if (typeof value !== 'undefined') {
-      WASM.HEAPU32[this._pointer >> 2] = value;
-    }
-  }
-
-  free () {
-    WASM._free(this.pointer);
-  }
-
-  get pointer () {
-    return this._pointer;
-  }
-
-  get value () {
-    return WASM.HEAPU32[this.pointer >> 2];
-  }
-}
-
-/**
- * C malloc allocated float buffer object
- */
-class WasmFloat32Buffer {
-  /**
-   * Allocate and assign number
-   * @param {number|undefined} value - If undefined the value is not assigned to the memory.
-   */
-  constructor (length) {
-    this._pointer = WASM._malloc(length * 4);
-    let offset = this._pointer >> 2;
-    this._buffer = WASM.HEAPF32.subarray(offset, offset + length);
-    this._length = length;
-  }
-
-  free () {
-    WASM._free(this.pointer);
-  }
-
-  set (array, offset) {
-    this._buffer.set(array, offset);
-  }
-
-  subarray (begin, end) {
-    return this._buffer.subarray(begin, end);
-  }
-
-  get pointer () {
-    return this._pointer;
-  }
-
-  get length () {
-    return this._length;
-  }
-}
-
-/**
- * C malloc allocated unsigned uint8 buffer object
- */
-class WasmUint8Buffer {
-  /**
-   * Allocate and assign number
-   * @param {number|undefined} value - If undefined the value is not assigned to the memory.
-   */
-  constructor (length) {
-    this._pointer = WASM._malloc(length);
-    this._buffer = WASM.HEAPU8.subarray(this._pointer, this._pointer + length);
-    this._length = length;
-  }
-
-  free () {
-    WASM._free(this.pointer);
-  }
-
-  set (array, offset) {
-    this._buffer.set(array, offset);
-  }
-
-  subarray (begin, end) {
-    return this._buffer.subarray(begin, end);
-  }
-
-  get pointer () {
-    return this._pointer;
-  }
-
-  get length () {
-    return this._length;
-  }
-}
 
 class _OggOpusEncoder {
   constructor (inputSampleRate, channelCount, bitsPerSecond = undefined) {
@@ -549,8 +421,11 @@ class _OggOpusEncoder {
   }
 }
 
-var oggEncoder;
+let oggEncoder;
 WASM.onRuntimeInitialized = function () {
+  // Enable Wasm-prefixed classes/functions
+  setWASM(WASM);
+
   // Emscripten (wasm) module is loaded
   // and notify the host ready to accept 'init' message.
   self.postMessage({ command: 'readyToInit' });
