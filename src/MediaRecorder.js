@@ -28,24 +28,30 @@ class MediaRecorder extends EventTarget {
     this._state = 'inactive';
     this._mimeType = mimeType || '';
     this._audioBitsPerSecond = audioBitsPerSecond || bitsPerSecond;
+    /** @type {'inactive'|'readyToInit'|'encoding'|'closed'} */
+    this.workerState = 'inactive';
 
     // Parse MIME Type
     if (!MediaRecorder.isTypeSupported(this._mimeType)) {
       throw new TypeError('invalid arguments, a MIME Type is not supported');
     }
+    // Initialize worker
     switch (MediaRecorder._parseType(this._mimeType).subtype) {
       case 'wave':
       case 'wav':
-        this.workerPath = scriptDirectory + 'WaveWorker.js';
+        this.worker = new Worker(scriptDirectory + 'WaveWorker.js', { type: 'module' });
         this._mimeType = mimeType;
         break;
 
       case 'audio/ogg':
       default:
-        this.workerPath = scriptDirectory + 'OggOpusWorker.js';
+        this.worker = new Worker(scriptDirectory + 'OggOpusWorker.js', { type: 'module' });
         this._mimeType = 'audio/ogg';
         break;
     }
+    this.worker.onmessage = (e) => this._onmessageFromWorker(e);
+    this.worker.onerror = (e) => this._onerrorFromWorker(e);
+
     // Get channel count and sampling rate
     // channelCount: https://www.w3.org/TR/mediacapture-streams/#media-track-settings
     // sampleRate: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/sampleRate
@@ -122,7 +128,14 @@ class MediaRecorder extends EventTarget {
       case 'init':
         // Initialize the worker
         let { sampleRate, channelCount, bitsPerSecond } = message;
-        this.worker.postMessage({ command, sampleRate, channelCount });
+        this.worker.postMessage({ command, sampleRate, channelCount, bitsPerSecond });
+        this.workerState = 'encoding';
+
+        // Start streaming
+        this.source.connect(this.processor);
+        this.processor.connect(this.context.destination);
+        let eventToPush = new global.Event('start');
+        this.dispatchEvent(eventToPush);
         break;
 
       case 'pushInputData':
@@ -162,14 +175,13 @@ class MediaRecorder extends EventTarget {
     switch (command) {
       case 'readyToInit':
         const { sampleRate, channelCount } = this;
-        this._postMessageToWorker('init',
-          { sampleRate, channelCount, bitsPerSecond: this.audioBitsPerSecond });
+        this.workerState = 'readyToInit';
 
-        // Start streaming
-        this.source.connect(this.processor);
-        this.processor.connect(this.context.destination);
-        eventToPush = new global.Event('start');
-        this.dispatchEvent(eventToPush);
+        // If start() is already called initialize worker
+        if (this.state === 'recording') {
+          this._postMessageToWorker('init',
+            { sampleRate, channelCount, bitsPerSecond: this.audioBitsPerSecond });
+        }
         break;
 
       case 'encodedData':
@@ -183,6 +195,8 @@ class MediaRecorder extends EventTarget {
         if (command === 'lastEncodedData') {
           eventToPush = new global.Event('stop');
           this.dispatchEvent(eventToPush);
+
+          this.workerState = 'closed';
         }
         break;
 
@@ -196,12 +210,19 @@ class MediaRecorder extends EventTarget {
    * @param {ErrorEvent} error - error object from the worker
    */
   _onerrorFromWorker (error) {
+    // Stop stream first
+    this.source.disconnect();
+    this.processor.disconnect();
+
+    this.worker.terminate();
+    this.workerState = 'closed';
+
+    // Send message to host
     let message = [
       'FileName: ' + error.filename,
       'LineNumber: ' + error.lineno,
       'Message: ' + error.message
     ].join(' - ');
-
     let errorToPush = new global.Event('error');
     errorToPush.name = 'UnknownError';
     errorToPush.message = message;
@@ -258,10 +279,12 @@ class MediaRecorder extends EventTarget {
     this._state = 'recording';
     this._enableAudioProcessCallback(timeslice);
 
-    // Initialize worker
-    this.worker = new Worker(this.workerPath);
-    this.worker.onmessage = (e) => this._onmessageFromWorker(e);
-    this.worker.onerror = (e) => this._onerrorFromWorker(e);
+    // If the worker is already loaded then start
+    if (this.workerState === 'readyToInit') {
+      const { sampleRate, channelCount } = this;
+      this._postMessageToWorker('init',
+        { sampleRate, channelCount, bitsPerSecond: this.audioBitsPerSecond });
+    }
   }
 
   /**
