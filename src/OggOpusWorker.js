@@ -190,7 +190,7 @@ class WasmUint8Buffer {
 }
 
 class _OggOpusEncoder {
-  constructor (inputSampleRate, channelCount) {
+  constructor (inputSampleRate, channelCount, bitsPerSecond = undefined) {
     this.config = {
       inputSampleRate, // Usually 44100Hz or 48000Hz
       channelCount
@@ -217,7 +217,7 @@ class _OggOpusEncoder {
     this.buffersInPage = 0;
 
     this.OggInitChecksumTable();
-    this.OpusInitCodec(OPUS_OUTPUT_SAMPLE_RATE, channelCount, undefined);
+    this.OpusInitCodec(OPUS_OUTPUT_SAMPLE_RATE, channelCount, bitsPerSecond);
     this.SpeexInitResampler(inputSampleRate, OPUS_OUTPUT_SAMPLE_RATE, channelCount);
     this.OggGenerateIdPage(inputSampleRate, channelCount);
     this.OggGenerateCommentPage();
@@ -559,8 +559,8 @@ WASM.onRuntimeInitialized = function () {
     const { command } = e.data;
     switch (command) {
       case 'init':
-        const { sampleRate, channelCount } = e.data;
-        oggEncoder = new _OggOpusEncoder(sampleRate, channelCount);
+        const { sampleRate, channelCount, bitsPerSecond } = e.data;
+        oggEncoder = new _OggOpusEncoder(sampleRate, channelCount, bitsPerSecond);
         break;
 
       case 'pushInputData':

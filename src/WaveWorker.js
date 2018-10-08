@@ -101,7 +101,8 @@ self.onmessage = (e) => {
   const { command } = e.data;
   switch (command) {
     case 'init':
-      const { sampleRate, channelCount } = e.data;
+      const { sampleRate, channelCount, bitsPerSecond } = e.data; // eslint-disable-line
+      // bitsPerSecond does not support yet.
       encoder = new _WaveEncoder(sampleRate, channelCount);
       break;
     case 'pushInputData':

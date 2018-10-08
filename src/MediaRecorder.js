@@ -21,22 +21,23 @@ class MediaRecorder extends EventTarget {
    *          attribute.
    */
   constructor (stream, options = {}) {
+    const { mimeType, audioBitsPerSecond, videoBitsPerSecond, bitsPerSecond } = options; // eslint-disable-line
     super();
     // Attributes for the specification conformance. These have their own getters.
     this._stream = stream;
     this._state = 'inactive';
-    this._mimeType = undefined;
-    this._audioBitsPerSecond = undefined;
+    this._mimeType = mimeType || '';
+    this._audioBitsPerSecond = audioBitsPerSecond || bitsPerSecond;
+
     // Parse MIME Type
-    let mime = options.mimeType || '';
-    if (!MediaRecorder.isTypeSupported(mime)) {
+    if (!MediaRecorder.isTypeSupported(this._mimeType)) {
       throw new TypeError('invalid arguments, a MIME Type is not supported');
     }
-    switch (MediaRecorder._parseType(mime).subtype) {
+    switch (MediaRecorder._parseType(this._mimeType).subtype) {
       case 'wave':
       case 'wav':
         this.workerPath = scriptDirectory + 'WaveWorker.js';
-        this._mimeType = options.mimeType;
+        this._mimeType = mimeType;
         break;
 
       case 'audio/ogg':
@@ -50,6 +51,9 @@ class MediaRecorder extends EventTarget {
     // sampleRate: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/sampleRate
     this.context = new AudioContext();
     let tracks = this.stream.getAudioTracks();
+    if (!tracks[0]) {
+      throw new Error('DOMException: UnkownError, media track not found.');
+    }
     this.channelCount = tracks[0].getSettings().channelCount || 1;
     this.sampleRate = this.context.sampleRate;
 
@@ -90,10 +94,8 @@ class MediaRecorder extends EventTarget {
   }
 
   /**
-   * The value of the Video encoding target bit rate that was passed to
-   * the Platform (potentially truncated, rounded, etc), or the calculated one
-   * if the user has specified bitsPerSecond.
-   * @return {number|undefined}
+   * The value of the Video encoding. Unsupported.
+   * @return {undefined}
    */
   get videoBitsPerSecond () {
     // Video encoding is not supported
@@ -119,7 +121,7 @@ class MediaRecorder extends EventTarget {
     switch (command) {
       case 'init':
         // Initialize the worker
-        let { sampleRate, channelCount } = message;
+        let { sampleRate, channelCount, bitsPerSecond } = message;
         this.worker.postMessage({ command, sampleRate, channelCount });
         break;
 
@@ -160,7 +162,8 @@ class MediaRecorder extends EventTarget {
     switch (command) {
       case 'readyToInit':
         const { sampleRate, channelCount } = this;
-        this._postMessageToWorker('init', { sampleRate, channelCount });
+        this._postMessageToWorker('init',
+          { sampleRate, channelCount, bitsPerSecond: this.audioBitsPerSecond });
 
         // Start streaming
         this.source.connect(this.processor);
