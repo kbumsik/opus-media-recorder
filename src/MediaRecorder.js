@@ -39,13 +39,14 @@ class MediaRecorder extends EventTarget {
     switch (MediaRecorder._parseType(this._mimeType).subtype) {
       case 'wave':
       case 'wav':
-        this.worker = new Worker(scriptDirectory + 'WaveWorker.js', { type: 'module' });
+        // TODO: try using type: 'module' when borwsers start supporting
+        this.worker = new Worker(scriptDirectory + 'WaveWorker.js');
         this._mimeType = mimeType;
         break;
 
       case 'audio/ogg':
       default:
-        this.worker = new Worker(scriptDirectory + 'OggOpusWorker.js', { type: 'module' });
+        this.worker = new Worker(scriptDirectory + 'OggOpusWorker.js');
         this._mimeType = 'audio/ogg';
         break;
     }
