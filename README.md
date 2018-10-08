@@ -124,6 +124,7 @@ Browsers with issues:
 
 * `opus-media-recorder` throws generic Error objects instead of native DOMException.
 * Because `audio/wav` is not designed for streaming, when `mimeType` is `audio/wav`, each `dataavailabe` events produces a complete and seprated `.wav` file that cannot be concatenated togather unlike Ogg and Webm.
+* There is no [`SecurityError`](https://w3c.github.io/mediacapture-record/#exception-summary) case implemented. (WIP)
 
 ## How to build
 
