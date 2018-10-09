@@ -31,27 +31,7 @@ class MediaRecorder extends EventTarget {
     /** @type {'inactive'|'readyToInit'|'encoding'|'closed'} */
     this.workerState = 'inactive';
 
-    // Parse MIME Type
-    if (!MediaRecorder.isTypeSupported(this._mimeType)) {
-      throw new TypeError('invalid arguments, a MIME Type is not supported');
-    }
-    // Initialize worker
-    switch (MediaRecorder._parseType(this._mimeType).subtype) {
-      case 'wave':
-      case 'wav':
-        // TODO: try using type: 'module' when borwsers start supporting
-        this.worker = new Worker(scriptDirectory + 'WaveWorker.js');
-        this._mimeType = mimeType;
-        break;
-
-      case 'audio/ogg':
-      default:
-        this.worker = new Worker(scriptDirectory + 'OggOpusWorker.js');
-        this._mimeType = 'audio/ogg';
-        break;
-    }
-    this.worker.onmessage = (e) => this._onmessageFromWorker(e);
-    this.worker.onerror = (e) => this._onerrorFromWorker(e);
+    this._initWorker();
 
     // Get channel count and sampling rate
     // channelCount: https://www.w3.org/TR/mediacapture-streams/#media-track-settings
@@ -117,6 +97,41 @@ class MediaRecorder extends EventTarget {
    */
   get audioBitsPerSecond () {
     return this._audioBitsPerSecond;
+  }
+
+  /**
+   * Initialize worker
+   * @param {string} mimeType - Optional and currently not used. Use this if
+   *                            a different mimeType other than this.mimeType needed.
+   */
+  _initWorker (mimeType = undefined) {
+    if (typeof mimeType === 'undefined') {
+      mimeType = this._mimeType;
+    }
+
+    // Parse MIME Type
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      throw new TypeError('invalid arguments, a MIME Type is not supported');
+    }
+
+    // Initialize worker
+    switch (MediaRecorder._parseType(mimeType).subtype) {
+      case 'wave':
+      case 'wav':
+        // TODO: try using type: 'module' when borwsers start supporting
+        this.worker = new Worker(scriptDirectory + 'WaveWorker.js');
+        break;
+
+      case 'audio/ogg':
+      default:
+        this.worker = new Worker(scriptDirectory + 'OggOpusWorker.js');
+        this._mimeType = 'audio/ogg';
+        break;
+    }
+
+    this.worker.onmessage = (e) => this._onmessageFromWorker(e);
+    this.worker.onerror = (e) => this._onerrorFromWorker(e);
+    this.workerState = 'inactive';
   }
 
   /**
@@ -277,6 +292,12 @@ class MediaRecorder extends EventTarget {
       throw new TypeError('invalid arguments, timeslice should be 0 or higher.');
     }
     timeslice /= 1000; // Convert milliseconds to seconds
+
+    // Check worker is closed (usually by stop()) and init.
+    if (this.workerState === 'closed') {
+      this._initWorker();
+    }
+
     this._state = 'recording';
     this._enableAudioProcessCallback(timeslice);
 
