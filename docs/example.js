@@ -8,7 +8,7 @@ let buttonStart = document.querySelector('#buttonStart');
 let buttonPause = document.querySelector('#buttonPause');
 let buttonResume = document.querySelector('#buttonResume');
 let buttonStop = document.querySelector('#buttonStop');
-let buttonStopTracks = document.querySelector('#buttonStopTracks');
+let buttonStopTracks = document.querySelector('#buttonStopTracks'); // For debugging purpose
 // User-selectable option
 let mimeSelect = document.querySelector('#mimeSelect');
 let mimeSelectValue = '';
@@ -110,7 +110,7 @@ function updateButtonState () {
       buttonPause.disabled = true;
       buttonResume.disabled = true;
       buttonStop.disabled = true;
-      buttonStopTracks.dusabled = false;
+      buttonStopTracks.disabled = false; // For debugging purpose
       break;
     case 'recording':
       buttonCreate.disabled = true;
@@ -118,7 +118,7 @@ function updateButtonState () {
       buttonPause.disabled = false;
       buttonResume.disabled = false;
       buttonStop.disabled = false;
-      buttonStopTracks.dusabled = false;
+      buttonStopTracks.disabled = false; // For debugging purpose
       break;
     case 'paused':
       buttonCreate.disabled = true;
@@ -126,7 +126,7 @@ function updateButtonState () {
       buttonPause.disabled = true;
       buttonResume.disabled = false;
       buttonStop.disabled = false;
-      buttonStopTracks.dusabled = false;
+      buttonStopTracks.disabled = false; // For debugging purpose
       break;
     default:
       // Maybe recorder is not initialized yet so just ingnore it.
