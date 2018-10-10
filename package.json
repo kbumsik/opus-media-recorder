@@ -1,13 +1,15 @@
 {
   "name": "opus-media-recorder",
   "version": "0.1.0",
-  "description": "MedialRecorer polyfill for Opus audio",
-  "main": "src/MediaRecorder.js",
-  "scripts": {
-    "build": "webpack-cli --config webpack.config.js",
-    "build:production": "webpack-cli --mode=production --config webpack.config.js",
-    "start": "npm run build && make && webpack-dev-server",
-    "clean": "make clean"
+  "author": "Bumsik Kim",
+  "license": "MIT",
+  "homepage": "https://github.com/kbumsik/opus-media-recorder",
+  "description": "MedialRecorer polyfill for Opus recording using WebAssembly",
+  "main": "dist/MediaRecorder.js",
+  "files": ["dist/*"],
+  "repository": {
+    "type": "git",
+    "url": "https+git://github.com/kbumsik/opus-media-recorder"
   },
   "keywords": [
     "MediaRecorder",
@@ -26,8 +28,12 @@
     "Wav",
     "Wave"
   ],
-  "author": "Bumsik Kim",
-  "license": "MIT",
+  "scripts": {
+    "build": "webpack-cli --config webpack.config.js",
+    "build:production": "webpack-cli --mode=production --config webpack.config.js",
+    "start": "npm run build && make && webpack-dev-server",
+    "clean": "make clean"
+  },
   "dependencies": {
     "event-target-shim": "^3.0.2"
   },
