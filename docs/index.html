@@ -21,6 +21,11 @@
       white-space: pre;
       font-size: 12px;
     }
+
+    /* Visualizations */
+    .stream-vis__canvas {
+    	margin-top: 0;
+    }
   </style>
   <script src="debuggingHelper.js"></script>
 </head>
@@ -63,6 +68,10 @@
     <div>
       <a id="link">Download Link</a>
     </div>
+  </div>
+
+  <div class="stream-vis__div">
+    <canvas class="stream-vis__canvas" width=auto height="150"></canvas>
   </div>
   <!-- console.log will be printed here -->
   <div id='errorLog'></div>

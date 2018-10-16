@@ -2,6 +2,7 @@
 
 // Recorder object
 let recorder;
+let visualAudioContext; // Only for decoration purpose.
 // Buttons
 let buttonCreate = document.querySelector('#buttonCreate');
 let buttonStart = document.querySelector('#buttonStart');
@@ -29,11 +30,14 @@ buttonCreate.onclick = () => {
       return stream;
     })
     .then(createMediaRecorder)
+    .catch(_ => console.log('MediaRecorder is failed!!'))
+    .then(createVisualization) // Decoration purpose only.
     .then(printStreamInfo) // Just for debugging purpose.
     .then(_ => console.log('Creating MediaRecorder is successful.'))
     .then(initButtons)
     .then(updateButtonState)
-    .catch(_ => console.log('MediaRecorder is failed!!'));
+    .catch(_ => console.log('Error after creating a MediaRecorder object. ' +
+      'Recording should still works.'));
 };
 
 function createMediaRecorder (stream) {
@@ -151,4 +155,115 @@ function printStreamInfo (stream) {
       }
     }
   }
+}
+
+// Decoration purpose only. opus-media-recorder users don't need this.
+function createVisualization (stream) {
+  if (visualAudioContext) {
+    return stream;
+  }
+
+  visualAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+  let timeAnalyser = visualAudioContext.createAnalyser();
+  timeAnalyser.minDecibels = -90;
+  timeAnalyser.maxDecibels = -10;
+  timeAnalyser.smoothingTimeConstant = 0.85;
+
+  let freqAnalyser = visualAudioContext.createAnalyser();
+  freqAnalyser.minDecibels = -90;
+  freqAnalyser.maxDecibels = -10;
+  freqAnalyser.smoothingTimeConstant = 0.85;
+
+  // set up canvas contexts for visualizations
+  let canvas = document.querySelector('.stream-vis__canvas');
+  let canvasContext = canvas.getContext('2d');
+  let intendedWidth = document.querySelector('.stream-vis__div').clientWidth;
+  canvas.setAttribute('width', intendedWidth);
+
+  let source = visualAudioContext.createMediaStreamSource(stream);
+  source.connect(timeAnalyser);
+  source.connect(freqAnalyser);
+
+  /**
+   * visualize stream
+   */
+  function visualize () {
+    const WIDTH = canvas.width;
+    const HEIGHT = canvas.height;
+
+    // time visualization prep
+    timeAnalyser.fftSize = 2048;
+    let timeBufferLength = timeAnalyser.fftSize;
+    let timeDataArray = new Uint8Array(timeBufferLength);
+
+    // frequency visualization prep
+    freqAnalyser.fftSize = 128;
+    let freqBufferLength = freqAnalyser.frequencyBinCount;
+    let freqDataArray = new Uint8Array(freqBufferLength);
+
+    // create time based visualization
+    function drawTime () {
+      timeAnalyser.getByteTimeDomainData(timeDataArray);
+
+      canvasContext.lineWidth = 4;
+      canvasContext.strokeStyle = 'rgb(120, 120, 120)';
+
+      canvasContext.beginPath();
+
+      let sliceWidth = WIDTH * 1.0 / timeBufferLength;
+      let x = 0;
+
+      for (let i = 0; i < timeBufferLength; i++) {
+        let v = timeDataArray[i] / 128.0;
+        let y = v * HEIGHT / 2;
+
+        if (i === 0) {
+          canvasContext.moveTo(x, y);
+        } else {
+          canvasContext.lineTo(x, y);
+        }
+
+        x += sliceWidth;
+      }
+
+      canvasContext.lineTo(canvas.width, canvas.height / 2);
+      canvasContext.stroke();
+    };
+
+    // create frequency based visualization
+    function drawFreq () {
+      freqAnalyser.getByteFrequencyData(freqDataArray);
+
+      let barWidth = (WIDTH / freqBufferLength);
+      let barHeight;
+      let x = 0;
+      let rgbBase = recorder.state === 'recording' ? 70 : 150;
+
+      for (let i = 0; i < freqBufferLength; i++) {
+        barHeight = 1.5 * freqDataArray[i];
+
+        // blue bars for low signal, red for high
+        let whiteStrength = rgbBase + barHeight / 3;
+        canvasContext.fillStyle = `rgb(${whiteStrength},${whiteStrength},${whiteStrength})`;
+        canvasContext.fillRect(x, HEIGHT - barHeight / 2, barWidth, barHeight / 2);
+
+        x += barWidth + 1;
+      }
+    };
+
+    function draw () {
+      requestAnimationFrame(draw);
+
+      canvasContext.clearRect(0, 0, WIDTH, HEIGHT);
+
+      drawTime();
+      drawFreq();
+    }
+
+    draw();
+  };
+
+  visualize();
+  return stream;
 }
