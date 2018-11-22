@@ -25,8 +25,12 @@ $(BUILD_DIR):
 ## libopus
 $(OPUS_OBJ_LIB): $(OPUS_DIR) $(OPUS_DIR)/autogen.sh
 	cd $< && ./autogen.sh
-	cd $< && emconfigure ./configure --disable-extra-programs \
-					--disable-doc --disable-intrinsics --disable-rtcd
+	cd $< && emconfigure ./configure \
+							--disable-extra-programs \
+							--disable-doc \
+							--disable-intrinsics \
+							--disable-rtcd \
+							--disable-asm
 	emmake make -C $<
 
 $(OPUS_OBJ): $(OPUS_OBJ_LIB) $(BUILD_DIR)
@@ -35,8 +39,7 @@ $(OPUS_OBJ): $(OPUS_OBJ_LIB) $(BUILD_DIR)
 ## libogg
 $(OGG_OBJ_LIB): $(OGG_DIR) $(OGG_DIR)/autogen.sh
 	cd $< && ./autogen.sh
-	cd $< && emconfigure ./configure --disable-extra-programs \
-					--disable-doc --disable-intrinsics --disable-rtcd
+	cd $< && emconfigure ./configure
 	emmake make -C $<
 
 $(OGG_OBJ): $(OGG_OBJ_LIB) $(BUILD_DIR)
@@ -45,7 +48,8 @@ $(OGG_OBJ): $(OGG_OBJ_LIB) $(BUILD_DIR)
 ## SpeexDSP
 $(SPEEX_OBJ_LIB): $(SPEEX_DIR) $(SPEEX_DIR)/autogen.sh
 	cd $< && ./autogen.sh
-	cd $< && emconfigure ./configure --disable-examples
+	cd $< && emconfigure ./configure \
+							--disable-examples
 	emmake make -C $<
 
 $(SPEEX_OBJ): $(SPEEX_OBJ_LIB) $(BUILD_DIR)

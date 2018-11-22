@@ -5,7 +5,20 @@ DIST_DIR = ./dist
 DOCS_DIR = ./docs
 
 # For Emscripten
-EMCC_OPTS=-g3 -O3 --llvm-lto 1 -s NO_DYNAMIC_EXECUTION=1 -s NO_FILESYSTEM=1
+# Reference: https://github.com/kripken/emscripten/blob/master/src/settings.js
+EMCC_OPTS = -g4 \
+			-Oz \
+			--llvm-lto 1 \
+			-s WASM=1 \
+			-s DETERMINISTIC=1 \
+			-s "BINARYEN_METHOD='native-wasm'" \
+			-s FILESYSTEM=0 \
+			-s NO_DYNAMIC_EXECUTION=1 \
+			-s ENVIRONMENT='worker' \
+			--closure 1 \
+			-s MALLOC="emmalloc" \
+			# -s MODULARIZE=1 \
+
 DEFAULT_EXPORTS:='_malloc','_free'
 OPUS_EXPORTS:='_opus_encoder_create','_opus_encode_float','_opus_encoder_ctl', \
 				'_opus_encoder_destroy'
@@ -18,7 +31,7 @@ NPM_BUILD_CMD = build
 # Options for production
 ifdef PRODUCTION
 	EMCC_OPTS := $(filter-out -g3, $(EMCC_OPTS))
-	EMCC_OPTS += -g0
+	EMCC_OPTS := $(filter-out "-s DETERMINISTIC=1", $(EMCC_OPTS))
 	NPM_BUILD_CMD = build:production
 endif
 
@@ -52,9 +65,11 @@ $(BUILD_DIR)/%.a:
 	make -C $(LIB_DIR) $@
 
 $(OGG_OPUS_WORKER): $(OGG_OPUS_JS) $(OPUS_OBJ) $(OGG_OBJ) $(SPEEX_OBJ) $(DIST_DIR)
-	emcc -o $@ $(EMCC_OPTS) \
+	emcc -o $@ \
+		$(EMCC_OPTS) \
 		-s EXPORTED_FUNCTIONS="[$(DEFAULT_EXPORTS),$(OPUS_EXPORTS),$(SPEEX_EXPORTS)]" \
-		--pre-js $< $(OPUS_OBJ) $(SPEEX_OBJ)
+		$(OPUS_OBJ) $(SPEEX_OBJ) \
+		--pre-js $<
 
 $(DOCS_DIR)/assets/%: $(DIST_DIR)/%
 	cp $< $@
