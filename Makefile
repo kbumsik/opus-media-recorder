@@ -17,6 +17,7 @@ EMCC_OPTS = -g4 \
 			-s ENVIRONMENT='worker' \
 			--closure 1 \
 			-s MALLOC="emmalloc" \
+			-s DISABLE_EXCEPTION_CATCHING=0 \
 			# -s MODULARIZE=1 \
 
 DEFAULT_EXPORTS:='_malloc','_free'
@@ -24,6 +25,16 @@ OPUS_EXPORTS:='_opus_encoder_create','_opus_encode_float','_opus_encoder_ctl', \
 				'_opus_encoder_destroy'
 SPEEX_EXPORTS:='_speex_resampler_init','_speex_resampler_process_interleaved_float', \
 				'_speex_resampler_destroy'
+
+WEBIDL = OggContainer.webidl
+WEBIDL_GLUE_BASE = $(addsuffix _glue,$(addprefix $(BUILD_DIR)/,$(WEBIDL)))
+WEBIDL_GLUE_JS = $(addsuffix .js,$(WEBIDL_GLUE_BASE))
+SRC = $(SRC_DIR)/OggContainer.cpp \
+		$(SRC_DIR)/cpp_webidl_js_binder.cpp
+INCLUDE = $(SRC_DIR)/OggContainer.hpp
+INCLUDE_DIR = $(SRC_DIR) \
+				$(LIB_DIR)/ogg/include \
+				$(BUILD_DIR)
 
 # For JavaScript build
 NPM_BUILD_CMD = build
@@ -39,6 +50,7 @@ endif
 export OPUS_OBJ = $(BUILD_DIR)/libopus.a
 export OGG_OBJ = $(BUILD_DIR)/libogg.a
 export SPEEX_OBJ = $(BUILD_DIR)/libspeexdsp.a
+OBJS = $(OPUS_OBJ) $(OGG_OBJ) $(SPEEX_OBJ)
 
 # JavaScript intermediate builds
 OGG_OPUS_JS = $(BUILD_DIR)/OggOpusWorker.js
@@ -54,7 +66,7 @@ DOCS_ASSETS = $(addprefix $(DOCS_DIR)/assets/, $(OUTPUT_FILES))
 
 all: $(OGG_OPUS_WORKER) $(DOCS_ASSETS)
 
-$(DIST_DIR):
+$(DIST_DIR) $(BUILD_DIR):
 	mkdir $@
 
 # Building libraries
@@ -64,12 +76,20 @@ $(BUILD_DIR)/%.js $(DIST_DIR)/%.js: $(SRC_DIR)/%.js
 $(BUILD_DIR)/%.a:
 	make -C $(LIB_DIR) $@
 
-$(OGG_OPUS_WORKER): $(OGG_OPUS_JS) $(OPUS_OBJ) $(OGG_OBJ) $(SPEEX_OBJ) $(DIST_DIR)
+$(WEBIDL_GLUE_JS): $(addprefix $(SRC_DIR)/,$(WEBIDL)) $(BUILD_DIR)
+	python $(EMSCRIPTEN)/tools/webidl_binder.py \
+		$< \
+		$(WEBIDL_GLUE_BASE)
+
+$(OGG_OPUS_WORKER): $(OGG_OPUS_JS) $(WEBIDL_GLUE_JS) $(SRC) $(INCLUDE) $(OBJS) $(DIST_DIR)
 	emcc -o $@ \
 		$(EMCC_OPTS) \
 		-s EXPORTED_FUNCTIONS="[$(DEFAULT_EXPORTS),$(OPUS_EXPORTS),$(SPEEX_EXPORTS)]" \
-		$(OPUS_OBJ) $(SPEEX_OBJ) \
-		--pre-js $<
+		$(addprefix -I,$(INCLUDE_DIR)) \
+		$(SRC) \
+		$(OBJS) \
+		--pre-js $< \
+		--post-js $(WEBIDL_GLUE_JS)
 
 $(DOCS_DIR)/assets/%: $(DIST_DIR)/%
 	cp $< $@
@@ -80,4 +100,4 @@ run:
 
 clean:
 	make -C $(LIB_DIR) clean
-	-rm -rf $(BUILD_DIR) $(DIST_DIR)
+	-rm -rf $(BUILD_DIR) $(DIST_DIR) WebIDLGrammar.pkl parser.out

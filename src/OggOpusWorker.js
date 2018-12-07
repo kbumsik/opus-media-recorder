@@ -1,27 +1,3 @@
-/**
- * Reference:
- *    Ogg: https://en.wikipedia.org/wiki/Ogg_page
- *    OggOpus: https://tools.ietf.org/html/rfc3533
- *             https://tools.ietf.org/html/rfc7845
- *
- * OggOpus Packet organization:
- *      Page 0         Pages 1 ... n        Pages (n+1) ...
- *   +------------+ +---+ +---+ ... +---+ +-----------+ +---------+ +--
- *   |            | |   | |   |     |   | |           | |         | |
- *   |+----------+| |+-----------------+| |+-------------------+ +-----
- *   |||ID Header|| ||  Comment Header || ||Audio Data Packet 1| | ...
- *   |+----------+| |+-----------------+| |+-------------------+ +-----
- *   |            | |   | |   |     |   | |           | |         | |
- *   +------------+ +---+ +---+ ... +---+ +-----------+ +---------+ +--
- *   ^      ^                           ^
- *   |      |                           |
- *   |      |                           Mandatory Page Break
- *   |      |
- *   |      ID header is contained on a single page
- *   |
- *   'Beginning Of Stream'
- */
-
 'use strict';
 
 import { writeString, setWASM, WasmInt32, WasmUint32, WasmUint8Buffer,
@@ -39,9 +15,6 @@ const OPUS_OUTPUT_MAX_LENGTH = 4000;
 const OPUS_FRAME_SIZE = 20; // Specified in ms.
 
 const SPEEX_RESAMPLE_QUALITY = 6; // Value between 0 and 10 inclusive. 10 being highest quality.
-
-const OGG_MAX_BUFFERS_PER_PAGE = 10; // Tradeoff latency with overhead
-const OGG_SERIAL = Math.floor(Math.random() * 0xFFFFFFFF); // Bitstream serial number, any random 32-bit number
 
 const BUFFER_LENGTH = 4096;
 
@@ -78,21 +51,12 @@ class _OggOpusEncoder {
     this._speex_resampler_init = WASM._speex_resampler_init;
     this._speex_resampler_process_interleaved_float = WASM._speex_resampler_process_interleaved_float;
     this._speex_resampler_destroy = WASM._speex_resampler_destroy;
+    // Ogg container imported using WebIDL binding
+    this._contrainer = new WASM.OggContainer(OPUS_OUTPUT_SAMPLE_RATE, channelCount,
+                                             Math.floor(Math.random() * 0xFFFFFFFF));
 
-    // Attributes for OGG packing
-    this.pageIndex = 0;
-    this.granulePosition = 0;
-    this.segmentData = new Uint8Array(255 * 255); // Maximum length of Opus data in a page
-    this.segmentDataIndex = 0;
-    this.segmentTable = new Uint8Array(255); // Maximum data segments
-    this.segmentTableIndex = 0;
-    this.buffersInPage = 0;
-
-    this.OggInitChecksumTable();
     this.OpusInitCodec(OPUS_OUTPUT_SAMPLE_RATE, channelCount, bitsPerSecond);
     this.SpeexInitResampler(inputSampleRate, OPUS_OUTPUT_SAMPLE_RATE, channelCount);
-    this.OggGenerateIdPage(inputSampleRate, channelCount);
-    this.OggGenerateCommentPage();
 
     this.inputSamplesPerChannel = inputSampleRate * OPUS_FRAME_SIZE / 1000;
     this.outputSamplePerChannel = OPUS_OUTPUT_SAMPLE_RATE * OPUS_FRAME_SIZE / 1000;
@@ -104,11 +68,15 @@ class _OggOpusEncoder {
     this.mResampledBuffer = new WasmFloat32Buffer(this.outputSamplePerChannel * channelCount);
     this.mOutputBuffer = new WasmUint8Buffer(OPUS_OUTPUT_MAX_LENGTH);
 
+    // Create Ogg metadata
+    this.OggGenerateIdPage();
+    this.OggGenerateCommentPage();
+
     // TODO: Figure out how to delete this thing.
     this.interleavedBuffers = (channelCount !== 1) ? new Float32Array(BUFFER_LENGTH * channelCount) : undefined;
   }
 
-  encode (buffers, length, duration) {
+  encode (buffers, final = false) {
     let samples = this.interleave(buffers);
     let sampleIndex = 0;
 
@@ -134,15 +102,33 @@ class _OggOpusEncoder {
         if (packetLength < 0) {
           throw new Error('Opus encoding error.');
         }
-        this.OggSegmentPacket(packetLength);
+        // Input packget to Ogg page generator
+        this._contrainer.writeStream(this.mOutputBuffer.pointer,
+                                     packetLength,
+                                     this.outputSamplePerChannel, // 960 samples
+                                     false);
         this.inputBufferIndex = 0;
       }
       sampleIndex += lengthToCopy;
     }
+    if (final) {
+      // Just to flag this is the end of the stream
+      this._contrainer.writeStream(this.mOutputBuffer.pointer,
+                                   0, // No bytes
+                                   0, // No samples
+                                   true);
+    }
 
-    this.buffersInPage++;
-    if (this.buffersInPage >= OGG_MAX_BUFFERS_PER_PAGE) {
-      this.OggGeneratePage();
+    // Generate Ogg pages
+    let morePage = 1;
+    while (morePage > 0) {
+      morePage = this._contrainer.producePacketPage(false);
+      this.OggPushPage();
+    }
+    // If this is the last call, then flush remaining packets into an Ogg page
+    if (final) {
+      this._contrainer.producePacketPage(true);
+      this.OggPushPage();
     }
   }
 
@@ -154,9 +140,7 @@ class _OggOpusEncoder {
     for (let i = 0; i < channelCount; ++i) {
       finalFrameBuffers.push(new Float32Array(BUFFER_LENGTH - (this.inputBufferIndex / channelCount)));
     }
-    this.encode(finalFrameBuffers);
-    this.headerType += 4;
-    this.OggGeneratePage();
+    this.encode(finalFrameBuffers, true);
   }
 
   /**
@@ -168,6 +152,7 @@ class _OggOpusEncoder {
     this.mOutputBuffer.free();
     this._opus_encoder_destroy(this.encoder);
     this._speex_resampler_destroy(this.resampler);
+    WASM.destroy(this._contrainer);
   }
 
   /**
@@ -228,196 +213,32 @@ class _OggOpusEncoder {
     }
   }
 
-  OggInitChecksumTable () {
-    this.checksumTable = [];
-    for (var i = 0; i < 256; i++) {
-      var r = i << 24;
-      for (var j = 0; j < 8; j++) {
-        r = ((r & 0x80000000) !== 0) ? ((r << 1) ^ 0x04c11db7) : (r << 1);
-      }
-      this.checksumTable[i] = (r & 0xffffffff);
-    }
-  }
-
-  OggGetChecksum (data) {
-    let checksum = 0;
-    for (let i = 0; i < data.length; i++) {
-      checksum = (checksum << 8) ^ this.checksumTable[ ((checksum >>> 24) & 0xff) ^ data[i] ];
-    }
-    return checksum >>> 0;
-  }
-
-  OggGenerateIdPage (inputRate, chCount) {
-    /**
-     * Identification header format:
-     *     0                   1                   2                   3
-     *     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-     *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *    |      'O'      |      'p'      |      'u'      |      's'      |
-     *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *    |      'H'      |      'e'      |      'a'      |      'd'      |
-     *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *    |  Version = 1  | Channel Count |           Pre-skip            |
-     *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *    |                     Input Sample Rate (Hz)                    |
-     *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *    |   Output Gain (Q7.8 in dB)    | Mapping Family|               |
-     *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+               :
-     *    |                                                               |
-     *    :               Optional Channel Mapping Table...               :
-     *    |                                                               |
-     *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     */
-    let view = new DataView(this.segmentData.buffer);
-    // Magic Signature 'OpusHead'
-    writeString(view, 0, 'OpusHead');
-    // The version must always be 1 (8 bits, unsigned).
-    view.setUint8(8, 1, true);
-    // Number of output channels (8 bits, unsigned).
-    view.setUint8(9, chCount, true);
-    // Number of samples (at 48 kHz) to discard from the decoder output when
-    // starting playback (16 bits, unsigned, little endian).
-    // Currently pre-skip is 80ms.
-    view.setUint16(10, 3840, true);
-    // The sampling rate of input source (32 bits, unsigned, little endian).
-    view.setUint32(12, inputRate, true);
-    // Output gain, an encoder should set this field to zero (16 bits, signed,
-    // little endian).
-    view.setUint16(16, 0, true);
-    // Channel Mapping Family 0: mono or stereo (left, right). (8 bits, unsigned).
-    view.setUint8(18, 0, true);
-    this.segmentTableIndex = 1;
-    this.segmentDataIndex = this.segmentTable[0] = 19;
-    this.headerType = 2;
-    this.OggGeneratePage();
+  OggGenerateIdPage () {
+    this._contrainer.produceIDPage();
+    this.OggPushPage();
   }
 
   OggGenerateCommentPage () {
-    /**
-     * Comment header format:
-     *   0                   1                   2                   3
-     *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |      'O'      |      'p'      |      'u'      |      's'      |
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |      'T'      |      'a'      |      'g'      |      's'      |
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |                     Vendor String Length                      |
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |                                                               |
-     *  :                        Vendor String...                       :
-     *  |                                                               |
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |                   User Comment List Length                    |
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |                 User Comment #0 String Length                 |
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |                                                               |
-     *  :                   User Comment #0 String...                   :
-     *  |                                                               |
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |                 User Comment #1 String Length                 |
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     */
-    let view = new DataView(this.segmentData.buffer);
-    // Magic Signature 'OpusTags'
-    writeString(view, 0, 'OpusTags');
-    // Vendor String
-    let vendor = 'Opus-Media-Recorder';
-    view.setUint32(8, vendor.length, true); // Vendor String Length
-    writeString(view, 12, vendor); // Vendor String name
-    let offset = 12 + vendor.length;
-    // User Comment
-    view.setUint32(offset, 0, true); // User Comment List Length: No user comments, so 0
-    offset += 4;
-
-    this.segmentTableIndex = 1;
-    this.segmentDataIndex = this.segmentTable[0] = offset;
-    this.headerType = 0;
-    this.OggGeneratePage();
+    this._contrainer.produceCommentPage();
+    this.OggPushPage();
   }
 
-  OggGeneratePage () {
-    /**
-     * Ogg page header format:
-     *   0                   1                   2                   3
-     *   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1| Byte
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  | capture_pattern: Magic number for page start "OggS"           | 0-3
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  | version       | header_type   | granule_position              | 4-7
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |                                                               | 8-11
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |                               | bitstream_serial_number       | 12-15
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |                               | page_sequence_number          | 16-19
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |                               | CRC_checksum                  | 20-23
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  |                               |page_segments  | segment_table | 24-27
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     *  | ...                                                           | 28-
-     *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     */
-    let granulePosition = (this.lastPositiveGranulePosition === this.granulePosition) ? -1 : this.granulePosition;
-    let pageBuffer = new ArrayBuffer(27 + this.segmentTableIndex + this.segmentDataIndex);
-    let view = new DataView(pageBuffer);
-    let page = new Uint8Array(pageBuffer);
-
-    writeString(view, 0, 'OggS');
-    view.setUint8(4, 0, true); // Version: 0
-    view.setUint8(5, this.headerType, true); // 1 = continuation, 2 = beginning of stream, 4 = end of stream
-
-    // Number of samples upto and including this page at 48000Hz, into signed 64 bit Little Endian integer
-    // Javascript Number maximum value is 53 bits or 2^53 - 1
-    view.setUint32(6, granulePosition, true);
-    if (granulePosition < 0) {
-      view.setInt32(10, Math.ceil(granulePosition / 4294967297) - 1, true);
-    } else {
-      view.setInt32(10, Math.floor(granulePosition / 4294967296), true);
+  OggPushPage () {
+    if (!this._contrainer.safeToCopy()) {
+      return false;
     }
-
-    view.setUint32(14, OGG_SERIAL, true); // Bitstream serial number
-    view.setUint32(18, this.pageIndex, true); // Page sequence number
-    this.pageIndex += 1;
-    view.setUint8(26, this.segmentTableIndex, true); // Number of segments in page.
-    page.set(this.segmentTable.subarray(0, this.segmentTableIndex), 27); // Segment Table
-    page.set(this.segmentData.subarray(0, this.segmentDataIndex), 27 + this.segmentTableIndex); // Segment Data
-    view.setUint32(22, this.OggGetChecksum(page), true); // Checksum
-
-    this.encodedBuffers.push(pageBuffer);
-
-    this.segmentTableIndex = 0;
-    this.segmentDataIndex = 0;
-    this.buffersInPage = 0;
-    if (granulePosition > 0) {
-      this.lastPositiveGranulePosition = granulePosition;
-    }
-  }
-
-  OggSegmentPacket (packetLength) {
-    var packetIndex = 0;
-
-    while (packetLength >= 0) {
-      if (this.segmentTableIndex === 255) {
-        this.OggGeneratePage();
-        this.headerType = 1;
-      }
-
-      var segmentLength = Math.min(packetLength, 255);
-      this.segmentTable[ this.segmentTableIndex++ ] = segmentLength;
-      this.segmentData.set(this.mOutputBuffer.subarray(packetIndex, packetIndex + segmentLength), this.segmentDataIndex);
-      this.segmentDataIndex += segmentLength;
-      packetIndex += segmentLength;
-      packetLength -= 255;
-    }
-
-    this.granulePosition += (48 * OPUS_FRAME_SIZE);
-    if (this.segmentTableIndex === 255) {
-      this.OggGeneratePage();
-      this.headerType = 0;
-    }
+    // Get header buffer
+    let header = new Uint8Array(WASM.HEAPU8.buffer,
+                                this._contrainer.getOggHeader(),
+                                this._contrainer.getOggHeaderSize());
+    // Get body buffer
+    let body = new Uint8Array(WASM.HEAPU8.buffer,
+                              this._contrainer.getOggBody(),
+                              this._contrainer.getOggBodySize());
+    // Copy buffer and push
+    this.encodedBuffers.push(new Uint8Array(header).buffer);
+    this.encodedBuffers.push(new Uint8Array(body).buffer);
+    return true;
   }
 }
 
@@ -439,14 +260,14 @@ WASM.onRuntimeInitialized = function () {
         break;
 
       case 'pushInputData':
-        const { channelBuffers, length, duration } = e.data;
+        const { channelBuffers, length, duration } = e.data; // eslint-disable-line
         // On Chrome, Float32Array doesn't recognize its buffer after transferred.
         // So re-create Float32Array right after a web worker received it.
         for (let i = 0; i < oggEncoder.config.channelCount; i++) {
           channelBuffers[i] = new Float32Array(channelBuffers[i].buffer);
         }
 
-        oggEncoder.encode(channelBuffers, length, duration);
+        oggEncoder.encode(channelBuffers);
         break;
 
       case 'getEncodedData':
