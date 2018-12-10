@@ -196,7 +196,9 @@ class MediaRecorder extends EventTarget {
         // If start() is already called initialize worker
         if (this.state === 'recording') {
           this._postMessageToWorker('init',
-            { sampleRate, channelCount, bitsPerSecond: this.audioBitsPerSecond });
+                                    { sampleRate,
+                                      channelCount,
+                                      bitsPerSecond: this.audioBitsPerSecond});
         }
         break;
 
@@ -305,7 +307,9 @@ class MediaRecorder extends EventTarget {
     if (this.workerState === 'readyToInit') {
       const { sampleRate, channelCount } = this;
       this._postMessageToWorker('init',
-        { sampleRate, channelCount, bitsPerSecond: this.audioBitsPerSecond });
+                                { sampleRate,
+                                  channelCount,
+                                  bitsPerSecond: this.audioBitsPerSecond });
     }
   }
 

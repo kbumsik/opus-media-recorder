@@ -1,7 +1,7 @@
 'use strict';
 
-import { writeString, setWASM, WasmInt32, WasmUint32, WasmUint8Buffer,
-  WasmFloat32Buffer } from './commonFunctions.js';
+import { setWASM, WasmInt32, WasmUint32,
+  WasmUint8Buffer, WasmFloat32Buffer } from './commonFunctions.js';
 
 /**
  * Configuration
@@ -73,7 +73,9 @@ class _OggOpusEncoder {
     this.OggGenerateCommentPage();
 
     // TODO: Figure out how to delete this thing.
-    this.interleavedBuffers = (channelCount !== 1) ? new Float32Array(BUFFER_LENGTH * channelCount) : undefined;
+    this.interleavedBuffers = (channelCount !== 1)
+                            ? new Float32Array(BUFFER_LENGTH * channelCount)
+                            : undefined;
   }
 
   encode (buffers, final = false) {
@@ -82,8 +84,10 @@ class _OggOpusEncoder {
 
     while (sampleIndex < samples.length) {
       // Copy samples to input buffer
-      let lengthToCopy = Math.min(this.mInputBuffer.length - this.inputBufferIndex, samples.length - sampleIndex);
-      this.mInputBuffer.set(samples.subarray(sampleIndex, sampleIndex + lengthToCopy), this.inputBufferIndex);
+      let lengthToCopy = Math.min(this.mInputBuffer.length - this.inputBufferIndex,
+                                  samples.length - sampleIndex);
+      this.mInputBuffer.set(samples.subarray(sampleIndex, sampleIndex + lengthToCopy),
+                            this.inputBufferIndex);
       this.inputBufferIndex += lengthToCopy;
 
       // When mInputBuffer is fill, then encode.
@@ -91,14 +95,23 @@ class _OggOpusEncoder {
         // Resampling
         let mInputLength = new WasmUint32(this.inputSamplesPerChannel);
         let mOutputLength = new WasmUint32(this.outputSamplePerChannel);
-        let err = this._speex_resampler_process_interleaved_float(this.resampler, this.mInputBuffer.pointer, mInputLength.pointer, this.mResampledBuffer.pointer, mOutputLength.pointer);
+        let err = this._speex_resampler_process_interleaved_float(
+          this.resampler,
+          this.mInputBuffer.pointer,
+          mInputLength.pointer,
+          this.mResampledBuffer.pointer,
+          mOutputLength.pointer);
         mInputLength.free();
         mOutputLength.free();
         if (err !== RESAMPLER_ERR_SUCCESS) {
           throw new Error('Resampling error.');
         }
         // Encoding
-        let packetLength = this._opus_encode_float(this.encoder, this.mResampledBuffer.pointer, this.outputSamplePerChannel, this.mOutputBuffer.pointer, this.mOutputBuffer.length);
+        let packetLength = this._opus_encode_float(this.encoder,
+                                                   this.mResampledBuffer.pointer,
+                                                   this.outputSamplePerChannel,
+                                                   this.mOutputBuffer.pointer,
+                                                   this.mOutputBuffer.length);
         if (packetLength < 0) {
           throw new Error('Opus encoding error.');
         }
@@ -205,7 +218,8 @@ class _OggOpusEncoder {
 
   SpeexInitResampler (inputRate, outputRate, chCount) {
     let mErr = new WasmUint32(undefined);
-    this.resampler = this._speex_resampler_init(chCount, inputRate, outputRate, SPEEX_RESAMPLE_QUALITY, mErr.pointer);
+    this.resampler = this._speex_resampler_init(chCount, inputRate, outputRate,
+                                                SPEEX_RESAMPLE_QUALITY, mErr.pointer);
     let err = mErr.value;
     mErr.free();
     if (err !== RESAMPLER_ERR_SUCCESS) {
