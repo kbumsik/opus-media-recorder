@@ -7,3 +7,6 @@
 [submodule "lib/speexdsp"]
 	path = lib/speexdsp
 	url = https://git.xiph.org/speexdsp.git
+[submodule "lib/webm"]
+	path = lib/webm
+	url = https://chromium.googlesource.com/webm/libwebm
