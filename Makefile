@@ -34,6 +34,7 @@ SRC = $(SRC_DIR)/OggContainer.cpp \
 INCLUDE = $(SRC_DIR)/OggContainer.hpp
 INCLUDE_DIR = $(SRC_DIR) \
 				$(LIB_DIR)/ogg/include \
+				$(LIB_DIR)/webm \
 				$(BUILD_DIR)
 
 # For JavaScript build
@@ -50,7 +51,8 @@ endif
 export OPUS_OBJ = $(BUILD_DIR)/libopus.a
 export OGG_OBJ = $(BUILD_DIR)/libogg.a
 export SPEEX_OBJ = $(BUILD_DIR)/libspeexdsp.a
-OBJS = $(OPUS_OBJ) $(OGG_OBJ) $(SPEEX_OBJ)
+export WEBM_OBJ = $(BUILD_DIR)/libwebm.a
+OBJS = $(OPUS_OBJ) $(OGG_OBJ) $(SPEEX_OBJ) $(WEBM_OBJ)
 
 # JavaScript intermediate builds
 OGG_OPUS_JS = $(BUILD_DIR)/OggOpusWorker.js
