@@ -21,7 +21,7 @@ enum {
   COMMENT_OPUS_MAGIC_OFFSET = 0,
   COMMENT_OPUS_VENDOR_LEN_OFFSET = 8,
   COMMENT_OPUS_VENDOR_STR_OFFSET = 12,
-  // COMMENT_OPUS_VENDOR_STR_OFFSET + 'Opus-Media-Recorder'
+  // COMMENT_OPUS_VENDOR_STR_OFFSET + 'opus-media-recorder'
   COMMENT_OPUS_COMMENT_LIST_LEN_OFFSET = (COMMENT_OPUS_VENDOR_STR_OFFSET + 19),
   COMMENT_OPUS_COMMENT_0_LEN_OFFSET = (COMMENT_OPUS_COMMENT_LIST_LEN_OFFSET +4),
   COMMENT_OPUS_COMMENT_0_STR_OFFSET = (COMMENT_OPUS_COMMENT_0_LEN_OFFSET +4)
@@ -149,8 +149,8 @@ void OggContainer::produceCommentPage(void)
   // Magic Signature 'OpusTags'
   const static std::string magic = "OpusTags";
   std::memcpy(header + COMMENT_OPUS_MAGIC_OFFSET, magic.c_str(), magic.size());
-  // Vendor String 'Opus-Media-Recorder'
-  const static std::string vendor = "Opus-Media-Recorder";
+  // Vendor String 'opus-media-recorder'
+  const static std::string vendor = "opus-media-recorder";
   uint32_t vendor_size = vendor.size();
   std::memcpy(header + COMMENT_OPUS_VENDOR_LEN_OFFSET,
               &vendor_size, sizeof(uint32_t));
