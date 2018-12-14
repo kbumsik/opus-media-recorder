@@ -92,10 +92,10 @@ document.addEventListener('DOMContentLoaded', _ => {
     let contentTypes = [
       'audio/wave',
       'audio/wav',
-      // 'audio/webm',
-      // 'audio/webm;codecs=opus',
       'audio/ogg',
-      'audio/ogg;codecs=opus'
+      'audio/ogg;codecs=opus',
+      'audio/webm',
+      'audio/webm;codecs=opus'
     ];
     contentTypes.forEach(type => {
       console.log(type + ' is ' +

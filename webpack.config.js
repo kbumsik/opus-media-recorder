@@ -1,13 +1,13 @@
-var config = {
+module.exports = {
+  "entry": {
+    MediaRecorder: "./src/MediaRecorder.js"
+  },
   "mode": "development",
-  "entry": [
-    "./src/index.js"
-  ],
   "output": {
     "library": "[name]",
     "libraryTarget": "umd",
     "libraryExport": "default",
-    "path": `${__dirname}/dist`,
+    "path": `${__dirname}/build`,
     "filename": "[name].js"
   },
   "module": {
@@ -15,7 +15,10 @@ var config = {
       {
         "enforce": "pre",
         "test": /\.(js|jsx|mjs)$/,
-        "exclude": /node_modules/,
+        "exclude": [
+          /node_modules/,
+          /build/
+        ],
         "use": "eslint-loader"
       },
       {
@@ -28,49 +31,31 @@ var config = {
           }
         }
       }
+      // {
+      //   "test": [
+      //     /\.wasm$/,
+      //     /Worker\.(js|jsx|mjs)$/
+      //   ],
+      //   "type": "javascript/auto",
+      //   "loader": "file-loader",
+      //   "options": {
+      //     "name": "[name].[ext]"
+      //   }
+      // }
     ]
   },
   devServer: {
-    contentBase: [`${__dirname}/docs`],
+    contentBase: [`${__dirname}/build`, __dirname],
     compress: true,
     port: 9000,
-    https: true
+    https: true,
+    index: "index.html",
+    overlay: {
+      warnings: true,
+      errors: true
+    },
+    watchOptions: {
+      poll: false
+    }
   }
 };
-
-var MediaRecorder = Object.assign({}, config, {
-  "entry": {
-    MediaRecorder: ["./src/MediaRecorder.js"]
-  },
-  "output": {
-    "library": "[name]",
-    "libraryTarget": "umd",
-    "libraryExport": "default",
-    "path": `${__dirname}/dist`,
-    "filename": "[name].js"
-  }
-});
-
-var WaveWorker = Object.assign({}, config, {
-  "entry": {
-    WaveWorker: ["./src/WaveWorker.js"]
-  },
-  "output": {
-    "path": `${__dirname}/dist`,
-    "filename": "WaveWorker.js"
-  }
-});
-
-var OggOpusWorker = Object.assign({}, config, {
-  "entry": {
-    OggOpusWorker: ["./src/OggOpusWorker.js"]
-  },
-  "output": {
-    "path": `${__dirname}/build`,
-    "filename": "OggOpusWorker.js"
-  }
-});
-
-module.exports = [
-  MediaRecorder, WaveWorker, OggOpusWorker
-];

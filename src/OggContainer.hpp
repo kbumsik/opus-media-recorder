@@ -1,8 +1,9 @@
-#ifndef OggContainer_h_
-#define OggContainer_h_
+#ifndef OGGCONTAINER_H_
+#define OGGCONTAINER_H_
 
 #include <cstdint>
-#include "ogg/ogg.h"
+#include <cstddef>
+#include "lib/ogg/include/ogg/ogg.h"
 
 /**
  * @brief Ogg Container class
@@ -63,7 +64,7 @@ public:
   OggContainer(uint32_t sample_rate, uint8_t channel_count, int serial);
   ~OggContainer();
 
-  void writeStream(void *data, ssize_t size, int num_samples, bool e_o_s = false);
+  void writeStream(void *data, std::size_t size, int num_samples, bool e_o_s = false);
 
   void produceIDPage(void);
   void produceCommentPage(void);
@@ -85,7 +86,7 @@ private:
    * @param num_samples   if < 0, the packet is considered as metadata packet
    * @param e_o_s         Set if this is the last packet
    */
-  void writePacket(uint8_t *data, ssize_t size, int num_samples, bool e_o_s = false);
+  void writePacket(uint8_t *data, std::size_t size, int num_samples, bool e_o_s = false);
 
   uint32_t sample_rate_;
   uint8_t channel_count_;
@@ -95,4 +96,4 @@ private:
   ogg_packet packet_;
 };
 
-#endif
+#endif /* OGGCONTAINER_H_ */

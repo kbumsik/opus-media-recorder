@@ -1,5 +1,4 @@
 #include "OggContainer.hpp"
-#include "ogg/ogg.h"
 #include <vector>
 #include <string>
 #include <cstdlib>
@@ -57,7 +56,7 @@ OggContainer::~OggContainer()
   ogg_stream_clear(&stream_state_);
 }
 
-void OggContainer::writeStream(void *data, ssize_t size,
+void OggContainer::writeStream(void *data, std::size_t size,
                               int num_samples, bool e_o_s)
 {
   writePacket((uint8_t *)data, size, num_samples, e_o_s);
@@ -243,7 +242,7 @@ long OggContainer::getOggBodySize(void)
   return page_.body_len;
 }
 
-void OggContainer::writePacket(uint8_t *data, ssize_t size,
+void OggContainer::writePacket(uint8_t *data, std::size_t size,
                               int num_samples, bool e_o_s)
 {
   if (ogg_stream_eos(&stream_state_)) {

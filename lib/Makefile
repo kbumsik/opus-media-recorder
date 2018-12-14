@@ -1,30 +1,32 @@
-BUILD_DIR ?= ./build # This can be overritten by ../Makefile
-OPUS_DIR = ./opus
-OGG_DIR = ./ogg
-SPEEX_DIR = ./speexdsp
-WEBM_DIR = ./webm
+BUILD_DIR ?= build
+# This can be overritten by ../Makefile
+LIB_BUILD_DIR ?= $(BUILD_DIR)/emscripten
+OPUS_DIR := opus
+OGG_DIR := ogg
+SPEEX_DIR := speexdsp
+WEBM_DIR := webm
 
 OPUS_OBJ_LIB = $(OPUS_DIR)/.libs/libopus.a
-OPUS_OBJ ?= $(BUILD_DIR)/libopus.a
+OPUS_OBJ ?= $(LIB_BUILD_DIR)/libopus.a
 
 OGG_OBJ_LIB = $(OGG_DIR)/src/.libs/libogg.a
-OGG_OBJ ?= $(BUILD_DIR)/libogg.a
+OGG_OBJ ?= $(LIB_BUILD_DIR)/libogg.a
 
 SPEEX_OBJ_LIB = $(SPEEX_DIR)/libspeexdsp/.libs/libspeexdsp.a
-SPEEX_OBJ ?= $(BUILD_DIR)/libspeexdsp.a
+SPEEX_OBJ ?= $(LIB_BUILD_DIR)/libspeexdsp.a
 
 WEBM_OBJ_LIB = $(WEBM_DIR)/libwebm.a
-WEBM_OBJ ?= $(BUILD_DIR)/libwebm.a
+WEBM_OBJ ?= $(LIB_BUILD_DIR)/libwebm.a
 
 .PHONY: all clean
 
 all: $(OPUS_OBJ) $(OGG_OBJ) $(SPEEX_OBJ) $(WEBM_OBJ)
 
+$(BUILD_DIR) $(LIB_BUILD_DIR):
+	mkdir -p $@
+
 $(addsuffix /autogen.sh, $(OPUS_DIR) $(OGG_DIR) $(SPEEX_DIR)) $(WEBM_DIR)/CMakeLists.txt:
 	git submodule update --init --recursive
-
-$(BUILD_DIR):
-	mkdir $@
 
 ## libopus
 $(OPUS_OBJ_LIB): $(OPUS_DIR) $(OPUS_DIR)/autogen.sh
@@ -37,7 +39,7 @@ $(OPUS_OBJ_LIB): $(OPUS_DIR) $(OPUS_DIR)/autogen.sh
 							--disable-asm
 	emmake make -C $<
 
-$(OPUS_OBJ): $(OPUS_OBJ_LIB) $(BUILD_DIR)
+$(OPUS_OBJ): $(OPUS_OBJ_LIB) $(LIB_BUILD_DIR)
 	cp $< $@
 
 ## libogg
@@ -46,7 +48,7 @@ $(OGG_OBJ_LIB): $(OGG_DIR) $(OGG_DIR)/autogen.sh
 	cd $< && emconfigure ./configure
 	emmake make -C $<
 
-$(OGG_OBJ): $(OGG_OBJ_LIB) $(BUILD_DIR)
+$(OGG_OBJ): $(OGG_OBJ_LIB) $(LIB_BUILD_DIR)
 	cp $< $@
 
 ## SpeexDSP
@@ -56,7 +58,7 @@ $(SPEEX_OBJ_LIB): $(SPEEX_DIR) $(SPEEX_DIR)/autogen.sh
 							--disable-examples
 	emmake make -C $<
 
-$(SPEEX_OBJ): $(SPEEX_OBJ_LIB) $(BUILD_DIR)
+$(SPEEX_OBJ): $(SPEEX_OBJ_LIB) $(LIB_BUILD_DIR)
 	cp $< $@
 
 # libwebm
@@ -66,7 +68,7 @@ $(WEBM_OBJ_LIB): $(WEBM_DIR)
 							-DCMAKE_CXX_FLAGS="-MMD -MP"
 	emmake make -C $<
 
-$(WEBM_OBJ): $(WEBM_OBJ_LIB) $(BUILD_DIR)
+$(WEBM_OBJ): $(WEBM_OBJ_LIB) $(LIB_BUILD_DIR)
 	cp $< $@
 
 ## etc.

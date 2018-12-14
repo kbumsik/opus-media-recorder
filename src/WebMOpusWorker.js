@@ -33,7 +33,7 @@ const RESAMPLER_ERR_SUCCESS = 0;
  */
 /* global Module */
 
-class _OggOpusEncoder {
+class WebMOpusWorker {
   constructor (inputSampleRate, channelCount, bitsPerSecond = undefined) {
     this.config = {
       inputSampleRate, // Usually 44100Hz or 48000Hz
@@ -51,8 +51,8 @@ class _OggOpusEncoder {
     this._speex_resampler_process_interleaved_float = Module._speex_resampler_process_interleaved_float;
     this._speex_resampler_destroy = Module._speex_resampler_destroy;
     // Ogg container imported using WebIDL binding
-    this._contrainer = new Module.OggContainer(OPUS_OUTPUT_SAMPLE_RATE, channelCount,
-                                               Math.floor(Math.random() * 0xFFFFFFFF));
+    this._contrainer = new Module.WebMContainer(OPUS_OUTPUT_SAMPLE_RATE, channelCount,
+                                                Math.floor(Math.random() * 0xFFFFFFFF));
 
     this.OpusInitCodec(OPUS_OUTPUT_SAMPLE_RATE, channelCount, bitsPerSecond);
     this.SpeexInitResampler(inputSampleRate, OPUS_OUTPUT_SAMPLE_RATE, channelCount);
@@ -66,10 +66,6 @@ class _OggOpusEncoder {
     this.mInputBuffer = new WasmFloat32Buffer(this.inputSamplesPerChannel * channelCount);
     this.mResampledBuffer = new WasmFloat32Buffer(this.outputSamplePerChannel * channelCount);
     this.mOutputBuffer = new WasmUint8Buffer(OPUS_OUTPUT_MAX_LENGTH);
-
-    // Create Ogg metadata
-    this.OggGenerateIdPage();
-    this.OggGenerateCommentPage();
 
     // TODO: Figure out how to delete this thing.
     this.interleavedBuffers = (channelCount !== 1)
@@ -114,33 +110,16 @@ class _OggOpusEncoder {
         if (packetLength < 0) {
           throw new Error('Opus encoding error.');
         }
-        // Input packget to Ogg page generator
-        this._contrainer.writeStream(this.mOutputBuffer.pointer,
-                                     packetLength,
-                                     this.outputSamplePerChannel, // 960 samples
-                                     false);
+        // Input packget to WebM page generator
+        this._contrainer.writeFrame(this.mOutputBuffer.pointer,
+                                    packetLength,
+                                    this.outputSamplePerChannel); // 960 samples
         this.inputBufferIndex = 0;
       }
       sampleIndex += lengthToCopy;
     }
     if (final) {
       // Just to flag this is the end of the stream
-      this._contrainer.writeStream(this.mOutputBuffer.pointer,
-                                   0, // No bytes
-                                   0, // No samples
-                                   true);
-    }
-
-    // Generate Ogg pages
-    let morePage = 1;
-    while (morePage > 0) {
-      morePage = this._contrainer.producePacketPage(false);
-      this.OggPushPage();
-    }
-    // If this is the last call, then flush remaining packets into an Ogg page
-    if (final) {
-      this._contrainer.producePacketPage(true);
-      this.OggPushPage();
     }
   }
 
@@ -225,37 +204,9 @@ class _OggOpusEncoder {
       throw new Error('Initializing resampler failed.');
     }
   }
-
-  OggGenerateIdPage () {
-    this._contrainer.produceIDPage();
-    this.OggPushPage();
-  }
-
-  OggGenerateCommentPage () {
-    this._contrainer.produceCommentPage();
-    this.OggPushPage();
-  }
-
-  OggPushPage () {
-    if (!this._contrainer.safeToCopy()) {
-      return false;
-    }
-    // Get header buffer
-    let header = new Uint8Array(Module.HEAPU8.buffer,
-                                this._contrainer.getOggHeader(),
-                                this._contrainer.getOggHeaderSize());
-    // Get body buffer
-    let body = new Uint8Array(Module.HEAPU8.buffer,
-                              this._contrainer.getOggBody(),
-                              this._contrainer.getOggBodySize());
-    // Copy buffer and push
-    this.encodedBuffers.push(new Uint8Array(header).buffer);
-    this.encodedBuffers.push(new Uint8Array(body).buffer);
-    return true;
-  }
 }
 
-let oggEncoder;
+let webmOpusWorker;
 Module.onRuntimeInitialized = function () {
   // Enable Wasm-prefixed classes/functions
   setWASM(Module);
@@ -269,36 +220,36 @@ Module.onRuntimeInitialized = function () {
     switch (command) {
       case 'init':
         const { sampleRate, channelCount, bitsPerSecond } = e.data;
-        oggEncoder = new _OggOpusEncoder(sampleRate, channelCount, bitsPerSecond);
+        webmOpusWorker = new WebMOpusWorker(sampleRate, channelCount, bitsPerSecond);
         break;
 
       case 'pushInputData':
         const { channelBuffers, length, duration } = e.data; // eslint-disable-line
         // On Chrome, Float32Array doesn't recognize its buffer after transferred.
         // So re-create Float32Array right after a web worker received it.
-        for (let i = 0; i < oggEncoder.config.channelCount; i++) {
+        for (let i = 0; i < webmOpusWorker.config.channelCount; i++) {
           channelBuffers[i] = new Float32Array(channelBuffers[i].buffer);
         }
 
-        oggEncoder.encode(channelBuffers);
+        webmOpusWorker.encode(channelBuffers);
         break;
 
       case 'getEncodedData':
       case 'done':
         if (command === 'done') {
-          oggEncoder.encodeFinalFrame();
+          webmOpusWorker.encodeFinalFrame();
         }
 
-        const buffers = oggEncoder.encodedBuffers;
+        const buffers = webmOpusWorker.encodedBuffers;
         self.postMessage({
           command: command === 'done' ? 'lastEncodedData' : 'encodedData',
           buffers
         }, buffers);
-        oggEncoder.encodedBuffers = [];
+        webmOpusWorker.encodedBuffers = [];
 
         if (command === 'done') {
           // Free memory and close
-          oggEncoder.close();
+          webmOpusWorker.close();
           self.close();
         }
         break;

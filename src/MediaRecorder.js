@@ -122,7 +122,12 @@ class MediaRecorder extends EventTarget {
         this.worker = new Worker(scriptDirectory + 'WaveWorker.js');
         break;
 
-      case 'audio/ogg':
+      case 'webm':
+        this.worker = new Worker(scriptDirectory + 'WebMOpusWorker.js');
+        this._mimeType = 'audio/webm';
+        break;
+
+      case 'ogg':
       default:
         this.worker = new Worker(scriptDirectory + 'OggOpusWorker.js');
         this._mimeType = 'audio/ogg';
@@ -401,20 +406,30 @@ class MediaRecorder extends EventTarget {
       return false;
     }
     if (type !== 'audio' ||
-      !(subtype === 'ogg' || subtype === 'wave' || subtype === 'wav')) {
+      !(subtype === 'ogg' || subtype === 'webm' ||
+        subtype === 'wave' || subtype === 'wav')) {
       // 3,4. If type and subtype are unsupported the return false.
       return false;
     }
     // 5. If codec is unsupported then return false.
     // 6. If the specified combination of all is not supported than return false.
-    if (subtype === 'ogg') {
-      if (codec !== 'opus' && codec) {
-        return false;
-      }
-    } else if (subtype === 'wave' || subtype === 'wav') {
-      if (codec) {
-        return false; // Currently only supports signed 16 bits
-      }
+    switch (subtype) {
+      case 'ogg':
+        if (codec !== 'opus' && codec) {
+          return false;
+        }
+        break;
+      case 'webm':
+        if (codec !== 'opus' && codec) {
+          return false;
+        }
+        break;
+      case 'wave':
+      case 'wav':
+        if (codec) {
+          return false; // Currently only supports signed 16 bits
+        }
+        break;
     }
     // 7. return true.
     return true;

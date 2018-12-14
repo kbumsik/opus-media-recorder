@@ -29,9 +29,8 @@
     "Wave"
   ],
   "scripts": {
-    "build": "webpack-cli --config webpack.config.js",
-    "build:production": "webpack-cli --mode=production --config webpack.config.js",
-    "start": "npm run build && make && webpack-dev-server",
+    "webpack": "webpack-cli",
+    "start": "webpack-dev-server",
     "clean": "make clean"
   },
   "dependencies": {
