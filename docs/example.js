@@ -66,7 +66,7 @@ function createMediaRecorder (stream) {
   };
   recorder.onpause = _ => console.log('Recorder paused');
   recorder.onresume = _ => console.log('Recorder resumed');
-  recorder.onerror = _ => console.log('Recorder encounters error');
+  recorder.onerror = e => console.log('Recorder encounters error:' + e.message);
 
   return stream;
 };
