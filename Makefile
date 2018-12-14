@@ -113,23 +113,23 @@ SRC_WEBM_OPUS_JS = $(SRC_DIR)/WebMOpusWorker.js
 ###########
 
 # 1.1 Static library targets
-$(OBJS) :
+$(OBJS):
 	make -C $(LIB_DIR) $@
 
 # 1.2 C++ - WebIDL - JavaScript glue code targets
-$(OGG_WEBIDL_GLUE_JS) : $(addprefix $(SRC_DIR)/,$(OGG_WEBIDL)) $(LIB_BUILD_DIR)
+$(OGG_WEBIDL_GLUE_JS): $(addprefix $(SRC_DIR)/,$(OGG_WEBIDL)) $(LIB_BUILD_DIR)
 	python $(EMSCRIPTEN)/tools/webidl_binder.py \
 		$< \
 		$(OGG_WEBIDL_GLUE_BASE)
 
-$(WEBM_WEBIDL_GLUE_JS) : $(addprefix $(SRC_DIR)/,$(WEBM_WEBIDL)) $(LIB_BUILD_DIR)
+$(WEBM_WEBIDL_GLUE_JS): $(addprefix $(SRC_DIR)/,$(WEBM_WEBIDL)) $(LIB_BUILD_DIR)
 	python $(EMSCRIPTEN)/tools/webidl_binder.py \
 		$< \
 		$(WEBM_WEBIDL_GLUE_BASE)
 
 # 1.3 Compile using emcc
-$(EMCC_OGG_OPUS_JS): $(SRC_OGG_OPUS_JS) $(OGG_WEBIDL_GLUE_JS) $(OGG_OPUS_SRC) $(OGG_OPUS_INCLUDE) $(OBJS)
-	emcc -o $@ \
+$(EMCC_OGG_OPUS_JS) $(EMCC_OGG_OPUS_JS:%.js=%.wasm): $(SRC_OGG_OPUS_JS) $(OGG_WEBIDL_GLUE_JS) $(OGG_OPUS_SRC) $(OGG_OPUS_INCLUDE) $(OBJS)
+	emcc -o $(EMCC_OGG_OPUS_JS) \
 		$(EMCC_OPTS) \
 		-s EXPORTED_FUNCTIONS="[$(DEFAULT_EXPORTS),$(OPUS_EXPORTS),$(SPEEX_EXPORTS)]" \
 		$(addprefix -I,$(EMCC_INCLUDE_DIR)) \
@@ -138,8 +138,8 @@ $(EMCC_OGG_OPUS_JS): $(SRC_OGG_OPUS_JS) $(OGG_WEBIDL_GLUE_JS) $(OGG_OPUS_SRC) $(
 		--pre-js $< \
 		--post-js $(word 2,$^)
 
-$(EMCC_WEBM_OPUS_JS): $(SRC_WEBM_OPUS_JS) $(WEBM_WEBIDL_GLUE_JS) $(WEBM_OPUS_SRC) $(WEBM_INCLUDE) $(OBJS)
-	emcc -o $@ \
+$(EMCC_WEBM_OPUS_JS) $(EMCC_WEBM_OPUS_JS:%.js=%.wasm): $(SRC_WEBM_OPUS_JS) $(WEBM_WEBIDL_GLUE_JS) $(WEBM_OPUS_SRC) $(WEBM_INCLUDE) $(OBJS)
+	emcc -o $(EMCC_WEBM_OPUS_JS) \
 		$(EMCC_OPTS) \
 		-s EXPORTED_FUNCTIONS="[$(DEFAULT_EXPORTS),$(OPUS_EXPORTS),$(SPEEX_EXPORTS)]" \
 		$(addprefix -I,$(EMCC_INCLUDE_DIR)) \
@@ -168,23 +168,23 @@ WAVE_WORKER_JS = $(BUILD_DIR)/WaveWorker.js
 WORKERS_JS = $(OGG_OPUS_WORKER_JS) $(WEBM_OPUS_WORKER_JS) $(WAVE_WORKER_JS)
 
 # 2.1 Copy extra JS files to /build/emscripten
-$(LIB_BUILD_DIR)/commonFunctions.js : $(SRC_DIR)/commonFunctions.js
+$(LIB_BUILD_DIR)/commonFunctions.js: $(SRC_DIR)/commonFunctions.js
 	cp $< $@
 
 # 2.2 Build Web Workers to /build
-$(OGG_OPUS_WORKER_JS) : $(LIB_BUILD_DIR)/OggOpusWorker.js $(LIB_BUILD_DIR)/commonFunctions.js
+$(OGG_OPUS_WORKER_JS): $(LIB_BUILD_DIR)/OggOpusWorker.js $(LIB_BUILD_DIR)/commonFunctions.js
 	npm run webpack -- --config webpack.workers.config.js \
 						$(NPM_FLAGS) \
 						$< \
 						-o $@
 
-$(WEBM_OPUS_WORKER_JS) : $(LIB_BUILD_DIR)/WebMOpusWorker.js $(LIB_BUILD_DIR)/commonFunctions.js
+$(WEBM_OPUS_WORKER_JS): $(LIB_BUILD_DIR)/WebMOpusWorker.js $(LIB_BUILD_DIR)/commonFunctions.js
 	npm run webpack -- --config webpack.workers.config.js \
 						$(NPM_FLAGS) \
 						$< \
 						-o $@
 
-$(WAVE_WORKER_JS) : $(SRC_DIR)/WaveWorker.js $(LIB_BUILD_DIR)/commonFunctions.js
+$(WAVE_WORKER_JS): $(SRC_DIR)/WaveWorker.js $(LIB_BUILD_DIR)/commonFunctions.js
 	npm run webpack -- --config webpack.workers.config.js \
 						$(NPM_FLAGS) \
 						$< \
@@ -194,7 +194,7 @@ $(WAVE_WORKER_JS) : $(SRC_DIR)/WaveWorker.js $(LIB_BUILD_DIR)/commonFunctions.js
 # 3. MediaRecorder.js compilation using webpack.
 ################################################################################
 
-$(BUILD_DIR)/MediaRecorder.js : $(SRC_DIR)/MediaRecorder.js $(WORKERS_JS)
+$(BUILD_DIR)/MediaRecorder.js: $(SRC_DIR)/MediaRecorder.js $(WORKERS_JS)
 	npm run webpack -- --config webpack.config.js \
 						$(NPM_FLAGS) \
 						--output-library MediaRecorder \
@@ -238,7 +238,7 @@ $(BUILD_DIR) $(LIB_BUILD_DIR):
 run: all
 	npm start -- --port $(DEV_SERVER_PORT)
 
-clean :
+clean:
 	make -C $(LIB_DIR) clean
 	-rm -rf $(BUILD_DIR) WebIDLGrammar.pkl parser.out
 	# Revert tracked files

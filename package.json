@@ -13,8 +13,10 @@
   },
   "keywords": [
     "MediaRecorder",
+    "MediaStream",
     "Opus",
     "Ogg",
+    "WebM",
     "WebAssembly",
     "WASM",
     "PCM",

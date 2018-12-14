@@ -2,16 +2,16 @@
 
 [Try it!](https://kbumsik.io/opus-media-recorder/)
 
-`opus-media-recorder` is a [MediaRecorder API](https://w3c.github.io/mediacapture-record/#mediarecorder-api) polyfill written in ES6 and WebAssembly. It aims a cross-browser Opus codec support with various audio formats such as Ogg and Webm. `opus-media-recorder` can be used as a ployfill, or it can replace the built-in MediaRecorder since `opus-media-recorder` supports more MIME types.
+`opus-media-recorder` is a [MediaRecorder API](https://w3c.github.io/mediacapture-record/#mediarecorder-api) polyfill written in ES6 and WebAssembly. It aims a cross-browser Opus codec support with various audio formats such as Ogg and WebM. `opus-media-recorder` can be used as a ployfill, or it can replace the built-in MediaRecorder since `opus-media-recorder` supports more MIME types.
 
-`opus-media-recorder` uses WebAssembly compiled from popular libraries (e.g libopus, libogg, and speexdsp) to ensure performance and standards-compliance.
+`opus-media-recorder` uses WebAssembly compiled from popular libraries (e.g libopus, libogg, libwebm, and speexdsp) to ensure performance and standards-compliance.
 
 ## Why opus-media-recorder?
 
 |              | opus-media-recorder | Chrome | Firefox | iOS | Edge |
 |--------------|:-------------------:|:------:|:-------:|:---:|:----:|
 | `audio/ogg`  |          O          |    X   |    O    |  X  |   X  |
-| `audio/webm` |         WIP         |    O   |    X    |  X  |   X  |
+| `audio/webm` |          O          |    O   |    X    |  X  |   X  |
 | `audio/wav`  |          O          |    X   |    X    |  X  |   X  |
 
 \* Both `audio/ogg` and `audio/webm` refer containers with Opus audio codec.
@@ -87,7 +87,7 @@ stopButton.addEventListener('click', () => {
 })
 ```
 
-### Use opus-media-recorder only when a browser don't support it
+### Use opus-media-recorder only when a browser doesn't support it
 
 ```javascript
 // Check if MediaRecorder available.
@@ -115,20 +115,21 @@ Browsers with issues:
 
 ## MIME Type support
 
+* `audio/webm`
+* `audio/webm; codecs=opus`
 * `audio/ogg`
 * `audio/ogg; codecs=opus`
 * `audio/wav` or `audio/wave`
-* `audio/webm`: Not yet supported, WIP.
 
 ## Limitations
 
 * `opus-media-recorder` throws generic Error objects instead of native DOMException.
-* Because `audio/wav` is not designed for streaming, when `mimeType` is `audio/wav`, each `dataavailabe` events produces a complete and seprated `.wav` file that cannot be concatenated togather unlike Ogg and Webm.
+* Because `audio/wav` is not designed for streaming, when `mimeType` is `audio/wav`, each `dataavailabe` events produces a complete and separated `.wav` file that cannot be concatenated together unlike Ogg and WebM. Therefore, it is recommended not to use `timeslice` option when calling `start()`, unless you know what the implication is.
 * There is no [`SecurityError`](https://w3c.github.io/mediacapture-record/#exception-summary) case implemented. (WIP)
 
 ## How to build
 
-1. To build from the source, you need [Emscripten](https://github.com/kripken/emscripten), [NPM](https://www.npmjs.com/), and basic C program build systems such as [GNU Make](https://www.gnu.org/software/make/).
+1. To build from the source, you need [Emscripten](https://github.com/kripken/emscripten), [NPM](https://www.npmjs.com/), Python 2.7 or higher, and basic C program build systems such as [GNU Make](https://www.gnu.org/software/make/).
 
 2. `npm install` to install JavaScript dependencies.
 
