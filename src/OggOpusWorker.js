@@ -159,12 +159,12 @@ class _OggOpusEncoder {
    * Free up memory before close the web worker.
    */
   close () {
+    Module.destroy(this._contrainer);
     this.mInputBuffer.free();
     this.mResampledBuffer.free();
     this.mOutputBuffer.free();
     this._opus_encoder_destroy(this.encoder);
     this._speex_resampler_destroy(this.resampler);
-    Module.destroy(this._contrainer);
   }
 
   /**
@@ -287,6 +287,7 @@ Module.onRuntimeInitialized = function () {
       case 'done':
         if (command === 'done') {
           oggEncoder.encodeFinalFrame();
+          oggEncoder.close();
         }
 
         const buffers = oggEncoder.encodedBuffers;
@@ -297,8 +298,7 @@ Module.onRuntimeInitialized = function () {
         oggEncoder.encodedBuffers = [];
 
         if (command === 'done') {
-          // Free memory and close
-          oggEncoder.close();
+          // Close
           self.close();
         }
         break;

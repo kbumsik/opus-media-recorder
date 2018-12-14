@@ -123,27 +123,16 @@ class WebMOpusWorker {
     }
   }
 
-  encodeFinalFrame () {
-    const {channelCount} = this.config;
-
-    // Fill zero to buffers, size is the same as re rest of inputBuffer.
-    let finalFrameBuffers = [];
-    for (let i = 0; i < channelCount; ++i) {
-      finalFrameBuffers.push(new Float32Array(BUFFER_LENGTH - (this.inputBufferIndex / channelCount)));
-    }
-    this.encode(finalFrameBuffers, true);
-  }
-
   /**
    * Free up memory before close the web worker.
    */
   close () {
+    Module.destroy(this._contrainer);
     this.mInputBuffer.free();
     this.mResampledBuffer.free();
     this.mOutputBuffer.free();
     this._opus_encoder_destroy(this.encoder);
     this._speex_resampler_destroy(this.resampler);
-    Module.destroy(this._contrainer);
   }
 
   /**
@@ -237,7 +226,7 @@ Module.onRuntimeInitialized = function () {
       case 'getEncodedData':
       case 'done':
         if (command === 'done') {
-          webmOpusWorker.encodeFinalFrame();
+          webmOpusWorker.close();
         }
 
         const buffers = webmOpusWorker.encodedBuffers;
@@ -248,8 +237,7 @@ Module.onRuntimeInitialized = function () {
         webmOpusWorker.encodedBuffers = [];
 
         if (command === 'done') {
-          // Free memory and close
-          webmOpusWorker.close();
+          // Close
           self.close();
         }
         break;

@@ -106,6 +106,7 @@ void WebMContainer::addTrack(void)
 
 void WebMContainer::writeOpusHeader(uint8_t *header)
 {
+  // Reference: https://wiki.xiph.org/MatroskaOpus
   // Magic Signature 'OpusHead'
   const static std::string magic = "OpusHead";
   std::memcpy(header + ID_OPUS_MAGIC_OFFSET, magic.c_str(), magic.size());
@@ -113,10 +114,9 @@ void WebMContainer::writeOpusHeader(uint8_t *header)
   header[ID_OPUS_VER_OFFSET] = 1;
   // Number of output channels (8 bits, unsigned).
   header[ID_OPUS_CH_OFFSET] = channel_count_;
-  // Number of samples (at 48 kHz) to discard from the decoder output when
-  // starting playback (16 bits, unsigned, little endian).
-  // Currently pre-skip is 80ms.
-  const uint16_t pre_skip = 3840;
+  // Firefox seems to have problem with non-zero pre-skip.
+  // Related topic: https://wiki.xiph.org/MatroskaOpus#Proposal_2:_Use_pre-skip_data_from_CodecPrivate
+  const uint16_t pre_skip = 0;
   std::memcpy(header + ID_OPUS_PRE_SKIP_OFFSET, &pre_skip, sizeof(uint16_t));
   // The sampling rate of input source (32 bits, unsigned, little endian).
   std::memcpy(header + ID_OPUS_SAMPLE_RATE_OFFSET, &sample_rate_, sizeof(uint32_t));
@@ -131,9 +131,8 @@ void WebMContainer::writeOpusHeader(uint8_t *header)
 void WebMContainer::writeFrame(void *data, std::size_t size, int num_samples)
 {
   // TODO: calculate paused time???
-  uint64_t timestamp = sample_rate_ / num_samples
-                      * segment_.GetSegmentInfo()->timecode_scale();
-  most_recent_timestamp_ += timestamp;
+  uint64_t timestamp = ((uint64_t)(num_samples * 1000000ull)) / (uint64_t)sample_rate_;
+  // uint64_t timestamp = 20 * 1000;
 
   if (force_one_libwebm_error_) {
     force_one_libwebm_error_ = false;
@@ -143,4 +142,5 @@ void WebMContainer::writeFrame(void *data, std::size_t size, int num_samples)
   segment_.AddFrame(reinterpret_cast<const uint8_t*>(data),
                     size, track_number_, most_recent_timestamp_ * 1000,
                     true); /* is_key: -- always true for audio */
+  most_recent_timestamp_ += timestamp;
 }
