@@ -240,4 +240,8 @@ run: all
 
 clean :
 	make -C $(LIB_DIR) clean
-	-rm -rf $(BUILD_DIR) $(DIST_DIR) WebIDLGrammar.pkl parser.out
+	-rm -rf $(BUILD_DIR) WebIDLGrammar.pkl parser.out
+	# Revert tracked files
+	git checkout HEAD -- $(DIST_DIR) $(DOCS_DIR)
+	# Removed untracked files too
+	git clean -df $(DIST_DIR) $(DOCS_DIR)
