@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', (e) => {
     return function (text) {
       oldFunction(text);
       lineCount += 1;
-      if (lineCount > 35) {
+      if (lineCount > 100) {
         let str = divLog.innerHTML;
         divLog.innerHTML = str.substring(str.indexOf('<br>') + '<br>'.length);
       }
