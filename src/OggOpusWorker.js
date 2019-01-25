@@ -1,7 +1,4 @@
-'use strict';
-
-import { setWASM, WasmInt32, WasmUint32,
-  WasmUint8Buffer, WasmFloat32Buffer } from './commonFunctions.js';
+const { EmscriptenMemoryAllocator } = require('./commonFunctions.js');
 
 /**
  * Configuration
@@ -27,12 +24,6 @@ const OPUS_SET_BITRATE_REQUEST = 4002;
 // in speex_resampler.h
 const RESAMPLER_ERR_SUCCESS = 0;
 
-/**
- * Emscripten (wasm) Module. Module is globally defined after compiling with emcc.
- * String indexing is used to prevent transpilers (e.g. babel) from changing name.
- */
-/* global Module */
-
 class _OggOpusEncoder {
   constructor (inputSampleRate, channelCount, bitsPerSecond = undefined) {
     this.config = {
@@ -41,6 +32,8 @@ class _OggOpusEncoder {
     };
     this.encodedBuffers = [];
 
+    // Emscripten memory allocator
+    this.memory = new EmscriptenMemoryAllocator(Module);
     // libopus functions imported from WASM
     this._opus_encoder_create = Module._opus_encoder_create;
     this._opus_encoder_ctl = Module._opus_encoder_ctl;
@@ -63,9 +56,9 @@ class _OggOpusEncoder {
     // Initialize all buffers
     //  |input buffer| =={reampler}=> |resampled buffer| =={encoder}=> |output buffer|
     this.inputBufferIndex = 0;
-    this.mInputBuffer = new WasmFloat32Buffer(this.inputSamplesPerChannel * channelCount);
-    this.mResampledBuffer = new WasmFloat32Buffer(this.outputSamplePerChannel * channelCount);
-    this.mOutputBuffer = new WasmUint8Buffer(OPUS_OUTPUT_MAX_LENGTH);
+    this.mInputBuffer = this.memory.mallocFloat32Buffer(this.inputSamplesPerChannel * channelCount);
+    this.mResampledBuffer = this.memory.mallocFloat32Buffer(this.outputSamplePerChannel * channelCount);
+    this.mOutputBuffer = this.memory.mallocUint8Buffer(OPUS_OUTPUT_MAX_LENGTH);
 
     // Create Ogg metadata
     this.OggGenerateIdPage();
@@ -92,8 +85,8 @@ class _OggOpusEncoder {
       // When mInputBuffer is fill, then encode.
       if (this.inputBufferIndex >= this.mInputBuffer.length) {
         // Resampling
-        let mInputLength = new WasmUint32(this.inputSamplesPerChannel);
-        let mOutputLength = new WasmUint32(this.outputSamplePerChannel);
+        let mInputLength = this.memory.mallocUint32(this.inputSamplesPerChannel);
+        let mOutputLength = this.memory.mallocUint32(this.outputSamplePerChannel);
         let err = this._speex_resampler_process_interleaved_float(
           this.resampler,
           this.mInputBuffer.pointer,
@@ -189,7 +182,7 @@ class _OggOpusEncoder {
   }
 
   OpusInitCodec (outRate, chCount, bitRate = undefined) {
-    let mErr = new WasmUint32(undefined);
+    let mErr = this.memory.mallocUint32(undefined);
     this.encoder = this._opus_encoder_create(outRate, chCount, OPUS_APPLICATION, mErr.pointer);
     let err = mErr.value;
     mErr.free();
@@ -210,13 +203,13 @@ class _OggOpusEncoder {
   }
 
   OpusSetOpusControl (request, vaArg) {
-    let value = new WasmInt32(vaArg);
+    let value = this.memory.mallocInt32(vaArg);
     this._opus_encoder_ctl(this.encoder, request, value.pointer);
     value.free();
   }
 
   SpeexInitResampler (inputRate, outputRate, chCount) {
-    let mErr = new WasmUint32(undefined);
+    let mErr = this.memory.mallocUint32(undefined);
     this.resampler = this._speex_resampler_init(chCount, inputRate, outputRate,
                                                 SPEEX_RESAMPLE_QUALITY, mErr.pointer);
     let err = mErr.value;
@@ -255,57 +248,34 @@ class _OggOpusEncoder {
   }
 }
 
-let oggEncoder;
-Module.onRuntimeInitialized = function () {
-  // Enable Wasm-prefixed classes/functions
-  setWASM(Module);
+// Emscripten (wasm) Module. Module is globally defined after compiled by emcc.
+/* global Module */
 
-  // Emscripten (wasm) module is loaded
-  // and notify the host ready to accept 'init' message.
-  self.postMessage({ command: 'readyToInit' });
-
-  self.onmessage = function (e) {
-    const { command } = e.data;
-    switch (command) {
-      case 'init':
-        const { sampleRate, channelCount, bitsPerSecond } = e.data;
-        oggEncoder = new _OggOpusEncoder(sampleRate, channelCount, bitsPerSecond);
-        break;
-
-      case 'pushInputData':
-        const { channelBuffers, length, duration } = e.data; // eslint-disable-line
-        // On Chrome, Float32Array doesn't recognize its buffer after transferred.
-        // So re-create Float32Array right after a web worker received it.
-        for (let i = 0; i < oggEncoder.config.channelCount; i++) {
-          channelBuffers[i] = new Float32Array(channelBuffers[i].buffer);
-        }
-
-        oggEncoder.encode(channelBuffers);
-        break;
-
-      case 'getEncodedData':
-      case 'done':
-        if (command === 'done') {
-          oggEncoder.encodeFinalFrame();
-          oggEncoder.close();
-        }
-
-        const buffers = oggEncoder.encodedBuffers;
-        self.postMessage({
-          command: command === 'done' ? 'lastEncodedData' : 'encodedData',
-          buffers
-        }, buffers);
-        oggEncoder.encodedBuffers = [];
-
-        if (command === 'done') {
-          // Close
-          self.close();
-        }
-        break;
-
-      default:
-        // Ignore
-        break;
-    }
-  };
+/**
+ * Define the encoder module interface. The worker will interact with
+ * the encoder via those functions only.
+ */
+Module.init = function (inputSampleRate, channelCount, bitsPerSecond) {
+  Module.encoder = new _OggOpusEncoder(inputSampleRate, channelCount, bitsPerSecond);
 };
+
+Module.encode = function (buffers) {
+  Module.encoder.encode(buffers);
+};
+
+Module.encodeFinalFrame = function () {
+  Module.encoder.encodeFinalFrame();
+};
+
+Module.flush = function () {
+  return Module.encoder.encodedBuffers.splice(0, Module.encoder.encodedBuffers.length);
+};
+
+Module.close = function () {
+  Module.encoder.close();
+};
+
+/**
+ * Export is automatically done by emcc with "-s MODULARIZE=1" option.
+ */
+// module.exports = Module;

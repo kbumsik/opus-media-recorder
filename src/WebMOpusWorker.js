@@ -1,7 +1,4 @@
-'use strict';
-
-import { setWASM, WasmInt32, WasmUint32,
-  WasmUint8Buffer, WasmFloat32Buffer } from './commonFunctions.js';
+const { EmscriptenMemoryAllocator } = require('./commonFunctions.js');
 
 /**
  * Configuration
@@ -33,7 +30,7 @@ const RESAMPLER_ERR_SUCCESS = 0;
  */
 /* global Module */
 
-class WebMOpusWorker {
+class _WebMOpusEncoder {
   constructor (inputSampleRate, channelCount, bitsPerSecond = undefined) {
     this.config = {
       inputSampleRate, // Usually 44100Hz or 48000Hz
@@ -41,6 +38,8 @@ class WebMOpusWorker {
     };
     this.encodedBuffers = [];
 
+    // Emscripten memory allocator
+    this.memory = new EmscriptenMemoryAllocator(Module);
     // libopus functions imported from WASM
     this._opus_encoder_create = Module._opus_encoder_create;
     this._opus_encoder_ctl = Module._opus_encoder_ctl;
@@ -63,9 +62,9 @@ class WebMOpusWorker {
     // Initialize all buffers
     //  |input buffer| =={reampler}=> |resampled buffer| =={encoder}=> |output buffer|
     this.inputBufferIndex = 0;
-    this.mInputBuffer = new WasmFloat32Buffer(this.inputSamplesPerChannel * channelCount);
-    this.mResampledBuffer = new WasmFloat32Buffer(this.outputSamplePerChannel * channelCount);
-    this.mOutputBuffer = new WasmUint8Buffer(OPUS_OUTPUT_MAX_LENGTH);
+    this.mInputBuffer = this.memory.mallocFloat32Buffer(this.inputSamplesPerChannel * channelCount);
+    this.mResampledBuffer = this.memory.mallocFloat32Buffer(this.outputSamplePerChannel * channelCount);
+    this.mOutputBuffer = this.memory.mallocUint8Buffer(OPUS_OUTPUT_MAX_LENGTH);
 
     // TODO: Figure out how to delete this thing.
     this.interleavedBuffers = (channelCount !== 1)
@@ -88,8 +87,8 @@ class WebMOpusWorker {
       // When mInputBuffer is fill, then encode.
       if (this.inputBufferIndex >= this.mInputBuffer.length) {
         // Resampling
-        let mInputLength = new WasmUint32(this.inputSamplesPerChannel);
-        let mOutputLength = new WasmUint32(this.outputSamplePerChannel);
+        let mInputLength = this.memory.mallocUint32(this.inputSamplesPerChannel);
+        let mOutputLength = this.memory.mallocUint32(this.outputSamplePerChannel);
         let err = this._speex_resampler_process_interleaved_float(
           this.resampler,
           this.mInputBuffer.pointer,
@@ -157,7 +156,7 @@ class WebMOpusWorker {
   }
 
   OpusInitCodec (outRate, chCount, bitRate = undefined) {
-    let mErr = new WasmUint32(undefined);
+    let mErr = this.memory.mallocUint32(undefined);
     this.encoder = this._opus_encoder_create(outRate, chCount, OPUS_APPLICATION, mErr.pointer);
     let err = mErr.value;
     mErr.free();
@@ -178,13 +177,13 @@ class WebMOpusWorker {
   }
 
   OpusSetOpusControl (request, vaArg) {
-    let value = new WasmInt32(vaArg);
+    let value = this.memory.mallocInt32(vaArg);
     this._opus_encoder_ctl(this.encoder, request, value.pointer);
     value.free();
   }
 
   SpeexInitResampler (inputRate, outputRate, chCount) {
-    let mErr = new WasmUint32(undefined);
+    let mErr = this.memory.mallocUint32(undefined);
     this.resampler = this._speex_resampler_init(chCount, inputRate, outputRate,
                                                 SPEEX_RESAMPLE_QUALITY, mErr.pointer);
     let err = mErr.value;
@@ -195,56 +194,34 @@ class WebMOpusWorker {
   }
 }
 
-let webmOpusWorker;
-Module.onRuntimeInitialized = function () {
-  // Enable Wasm-prefixed classes/functions
-  setWASM(Module);
+// Emscripten (wasm) Module. Module is globally defined after compiled by emcc.
+/* global Module */
 
-  // Emscripten (wasm) module is loaded
-  // and notify the host ready to accept 'init' message.
-  self.postMessage({ command: 'readyToInit' });
-
-  self.onmessage = function (e) {
-    const { command } = e.data;
-    switch (command) {
-      case 'init':
-        const { sampleRate, channelCount, bitsPerSecond } = e.data;
-        webmOpusWorker = new WebMOpusWorker(sampleRate, channelCount, bitsPerSecond);
-        break;
-
-      case 'pushInputData':
-        const { channelBuffers, length, duration } = e.data; // eslint-disable-line
-        // On Chrome, Float32Array doesn't recognize its buffer after transferred.
-        // So re-create Float32Array right after a web worker received it.
-        for (let i = 0; i < webmOpusWorker.config.channelCount; i++) {
-          channelBuffers[i] = new Float32Array(channelBuffers[i].buffer);
-        }
-
-        webmOpusWorker.encode(channelBuffers);
-        break;
-
-      case 'getEncodedData':
-      case 'done':
-        if (command === 'done') {
-          webmOpusWorker.close();
-        }
-
-        const buffers = webmOpusWorker.encodedBuffers;
-        self.postMessage({
-          command: command === 'done' ? 'lastEncodedData' : 'encodedData',
-          buffers
-        }, buffers);
-        webmOpusWorker.encodedBuffers = [];
-
-        if (command === 'done') {
-          // Close
-          self.close();
-        }
-        break;
-
-      default:
-        // Ignore
-        break;
-    }
-  };
+/**
+ * Define the encoder module interface. The worker will interact with
+ * the encoder via those functions only.
+ */
+Module.init = function (inputSampleRate, channelCount, bitsPerSecond) {
+  Module.encoder = new _WebMOpusEncoder(inputSampleRate, channelCount, bitsPerSecond);
 };
+
+Module.encode = function (buffers) {
+  Module.encoder.encode(buffers);
+};
+
+Module.encodeFinalFrame = function () {
+  // Nothing to do
+};
+
+Module.flush = function () {
+  return Module.encoder.encodedBuffers.splice(0, Module.encoder.encodedBuffers.length);
+};
+
+Module.close = function () {
+  Module.encoder.close();
+};
+
+/**
+ * Export is automatically done by emcc with "-s MODULARIZE=1" option.
+ */
+// module.exports = Module;

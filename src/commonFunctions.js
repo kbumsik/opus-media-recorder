@@ -1,9 +1,4 @@
 /**
- * Emscripten (wasm) Module. It has be initialized by setWASM.
- */
-let WASM;
-
-/**
  * Write a string to a DataView.
  * @param {DataView} dataView - dataView object to write a string.
  * @param {*} offset - offset in bytes
@@ -16,55 +11,50 @@ function writeString (dataView, offset, string) {
 }
 
 /**
- * Set a wasm module for Wasm-prefixed classes/functions
- * @param {WebAssemblyModule} module - module to set
- */
-function setWASM (module) {
-  WASM = module;
-}
-
-/**
  * C molloc class interface
  */
-class WasmMallocPointer {
+class _AllocatedPointer {
   /**
    * Allocate memory
+   * @param {emModule} Module - Emscripten module object
    * @param {number} size - size of allocated memory in bytes.
    * @param {boolean} isSigned
    * @param {boolean} isFloat
    */
-  constructor (size, isSigned = false, isFloat = false) {
+  constructor (emModule, size, isSigned, isFloat) {
     this._size = size;
+    this._module = emModule;
+
     switch (this._size) {
       case 1:
-        this._heapArray = isSigned ? WASM.HEAP8 : WASM.HEAPU8;
+        this._heapArray = isSigned ? this._module.HEAP8 : this._module.HEAPU8;
         break;
       case 2:
-        this._heapArray = isSigned ? WASM.HEAP16 : WASM.HEAPU16;
+        this._heapArray = isSigned ? this._module.HEAP16 : this._module.HEAPU16;
         break;
       case 4:
-        this._heapArray = isSigned ? WASM.HEAP32 : WASM.HEAPU32;
+        this._heapArray = isSigned ? this._module.HEAP32 : this._module.HEAPU32;
         break;
       default:
         // Pointer is treated as buffer
-        this._heapArray = WASM.HEAPU8;
+        this._heapArray = this._module.HEAPU8;
     }
 
     if (isFloat) {
       // When floating nuber set, override setting.
       this._size = 4;
-      this._heapArray = WASM.HEAPF32;
+      this._heapArray = this._module.HEAPF32;
     }
 
     // Note that is uses the original size parameter.
-    this._pointer = WASM._malloc(size);
+    this._pointer = this._module._malloc(size);
   }
 
   /**
    * Free memory
    */
   free () {
-    WASM._free(this.pointer);
+    this._module._free(this.pointer);
   }
 
   /**
@@ -115,13 +105,14 @@ class WasmMallocPointer {
 /**
  * C malloc allocated signed int32 object
  */
-class WasmInt32 extends WasmMallocPointer {
+class _Int32Pointer extends _AllocatedPointer {
   /**
    * Allocate and assign number
+   * @param {emModule} Module - Emscripten module object
    * @param {number|undefined} value - If undefined the value is not assigned to the memory.
    */
-  constructor (value) {
-    super(4, true);
+  constructor (emModule, value) {
+    super(emModule, 4, true, false);
     if (typeof value !== 'undefined') {
       this.value = value;
     }
@@ -131,13 +122,14 @@ class WasmInt32 extends WasmMallocPointer {
 /**
  * C malloc allocated unsigned int32 object
  */
-class WasmUint32 extends WasmMallocPointer {
+class _Uint32Pointer extends _AllocatedPointer {
   /**
    * Allocate and assign number
+   * @param {emModule} Module - Emscripten module object
    * @param {number|undefined} value - If undefined the value is not assigned to the memory.
    */
-  constructor (value) {
-    super(4, false);
+  constructor (emModule, value) {
+    super(emModule, 4, false, false);
     if (typeof value !== 'undefined') {
       this.value = value;
     }
@@ -147,35 +139,36 @@ class WasmUint32 extends WasmMallocPointer {
 /**
  * C malloc allocated float buffer object
  */
-class WasmMallocBuffer extends WasmMallocPointer {
+class _AllocatedBuffer extends _AllocatedPointer {
   /**
    * Allocate buffer
+   * @param {emModule} Module - Emscripten module object
    * @param {number} length - Size of buffer in the number of units, NOT in bytes
    * @param {number} unitSize - Size of a unit in bytes
    * @param {bool} isSigned
    * @param {bool} isFloat
    */
-  constructor (length, unitSize, isSigned = false, isFloat = false) {
-    super(length * unitSize, isSigned, isFloat);
+  constructor (emModule, length, unitSize, isSigned, isFloat) {
+    super(emModule, length * unitSize, isSigned, isFloat);
     let bitsToShift = 0;
     switch (unitSize) {
       case 1:
-        this._heapArray = isSigned ? WASM.HEAP8 : WASM.HEAPU8;
+        this._heapArray = isSigned ? this._module.HEAP8 : this._module.HEAPU8;
         bitsToShift = 0;
         break;
       case 2:
-        this._heapArray = isSigned ? WASM.HEAP16 : WASM.HEAPU16;
+        this._heapArray = isSigned ? this._module.HEAP16 : this._module.HEAPU16;
         bitsToShift = 1;
         break;
       case 4:
-        this._heapArray = isSigned ? WASM.HEAP32 : WASM.HEAPU32;
+        this._heapArray = isSigned ? this._module.HEAP32 : this._module.HEAPU32;
         bitsToShift = 2;
         break;
       default:
         throw new Error('Unit size must be an integer-size');
     }
     if (isFloat) {
-      this._heapArray = WASM.HEAPF32;
+      this._heapArray = this._module.HEAPF32;
       bitsToShift = 2;
     }
     let offset = this._pointer >> bitsToShift;
@@ -199,24 +192,48 @@ class WasmMallocBuffer extends WasmMallocPointer {
 /**
  * C malloc allocated float buffer object
  */
-class WasmFloat32Buffer extends WasmMallocBuffer {
-  constructor (length) {
-    super(length, 4, true, true);
+class _Float32Buffer extends _AllocatedBuffer {
+  constructor (emModule, length) {
+    super(emModule, length, 4, true, true);
   }
 }
 
 /**
  * C malloc allocated unsigned uint8 buffer object
  */
-class WasmUint8Buffer extends WasmMallocBuffer {
+class _Uint8Buffer extends _AllocatedBuffer {
   /**
    * Allocate and assign number
    * @param {number|undefined} value - If undefined the value is not assigned to the memory.
    */
-  constructor (length) {
-    super(length, 1, false, false);
+  constructor (emModule, length) {
+    super(emModule, length, 1, false, false);
   }
 }
 
-export { writeString,
-  setWASM, WasmInt32, WasmUint32, WasmUint8Buffer, WasmFloat32Buffer };
+/**
+ * Abstracts C pointers and malloc for Emscripten modules.
+ */
+class EmscriptenMemoryAllocator {
+  constructor (emModule) {
+    this._module = emModule;
+  }
+
+  mallocInt32 (value) {
+    return new _Int32Pointer(this._module, value);
+  }
+
+  mallocUint32 (value) {
+    return new _Uint32Pointer(this._module, value);
+  }
+
+  mallocUint8Buffer (length) {
+    return new _Uint8Buffer(this._module, length);
+  }
+
+  mallocFloat32Buffer (length) {
+    return new _Float32Buffer(this._module, length);
+  }
+}
+
+module.exports = { writeString, EmscriptenMemoryAllocator };

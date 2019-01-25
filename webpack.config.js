@@ -4,11 +4,8 @@ module.exports = {
   },
   "mode": "development",
   "output": {
-    "library": "[name]",
-    "libraryTarget": "umd",
-    "libraryExport": "default",
-    "path": `${__dirname}/build`,
-    "filename": "[name].js"
+    "globalObject": "typeof self !== \'undefined\' ? self : this",
+    "libraryExport": "default"
   },
   "module": {
     "rules": [
@@ -22,26 +19,15 @@ module.exports = {
         "use": "eslint-loader"
       },
       {
-        "test": /\.(js|mjs)$/,
-        "exclude": /node_modules/,
-        "use": {
-          "loader": "babel-loader",
-          "options": {
-            "presets": ["env"]
+        test: /\.m?js$/,
+        exclude: /(node_modules|bower_components)/,
+        use: {
+          loader: "babel-loader",
+          options: {
+            presets: ["@babel/preset-env"]
           }
         }
       }
-      // {
-      //   "test": [
-      //     /\.wasm$/,
-      //     /Worker\.(js|jsx|mjs)$/
-      //   ],
-      //   "type": "javascript/auto",
-      //   "loader": "file-loader",
-      //   "options": {
-      //     "name": "[name].[ext]"
-      //   }
-      // }
     ]
   },
   devServer: {

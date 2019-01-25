@@ -26,18 +26,19 @@ buttonCreate.onclick = () => {
     .then((stream) => {
       if (recorder && recorder.state !== 'inactive') {
         console.log('Stop the recorder first');
-        throw new Error('');
+        throw new Error('Stop the recorder first');
       }
       return stream;
     })
     .then(createMediaRecorder)
-    .catch(_ => console.log('MediaRecorder is failed!!'))
+    .catch(e => {
+      console.log(`MediaRecorder is failed: ${e.message}`);
+      Promise.reject(new Error());
+    })
     .then(printStreamInfo) // Just for debugging purpose.
     .then(_ => console.log('Creating MediaRecorder is successful.'))
     .then(initButtons)
-    .then(updateButtonState)
-    .catch(_ => console.log('Error after creating a MediaRecorder object. ' +
-      'Recording should still works.'));
+    .then(updateButtonState);
 };
 
 function createMediaRecorder (stream) {

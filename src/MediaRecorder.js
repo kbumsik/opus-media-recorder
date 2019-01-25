@@ -1,9 +1,6 @@
-'use strict';
-import {EventTarget, defineEventAttribute} from 'event-target-shim';
+const { EventTarget, defineEventAttribute } = require('event-target-shim');
 
 const AudioContext = global.AudioContext || global.webkitAudioContext;
-const scriptPath = document.currentScript.src;
-const scriptDirectory = scriptPath.substring(0, scriptPath.lastIndexOf('/')) + '/';
 const BUFFER_SIZE = 4096;
 
 /**
@@ -12,6 +9,13 @@ const BUFFER_SIZE = 4096;
  */
 class MediaRecorder extends EventTarget {
   /**
+   * A function that returns the encoder web worker
+   * @name workerFactory
+   * @function
+   * @returns {worker} An instance of ./encoderWorker.js web worker.
+   */
+
+  /**
    *
    * @param {MediaStream} stream - The MediaStream to be recorded. This will
    *          be the value of the stream attribute.
@@ -19,9 +23,25 @@ class MediaRecorder extends EventTarget {
    *          the UA instructing how the recording will take part.
    *          options.mimeType, if present, will become the value of mimeType
    *          attribute.
+   * @param {Object} [workerOptions] This is a NON-STANDARD options to
+   *          configure how to import the web worker .wasm compiled binaries
+   *          used for encoding.
+   * @param {workerFactory} [workerOptions.encoderWorkerFactory] A factory
+   *          function that create a web worker instance of ./encoderWorker.js
+   *          and returns it. function(){return new Worker('./encoderWorker.umd.js')}
+   *          is used by default. This is NON-STANDARD.
+   * @param {string} [workerOptions.OggOpusEncoderWasmPath]
+   *          Path of ./OggOpusWorker.wasm which is used for OGG Opus encoding
+   *          by the encoder worker. This is NON-STANDARD.
+   * @param {string} [workerOptions.WebMOpusEncoderWasmPath]
+   *          Path of ./WebMOpusWorker.wasm which is used for WebM Opus encoding
+   *          by the encoder worker. This is NON-STANDARD.
    */
-  constructor (stream, options = {}) {
+  constructor (stream, options = {}, workerOptions = {}) {
     const { mimeType, audioBitsPerSecond, videoBitsPerSecond, bitsPerSecond } = options; // eslint-disable-line
+    // NON-STANDARD options
+    const { encoderWorkerFactory, OggOpusEncoderWasmPath, WebMOpusEncoderWasmPath } = workerOptions;
+
     super();
     // Attributes for the specification conformance. These have their own getters.
     this._stream = stream;
@@ -31,7 +51,34 @@ class MediaRecorder extends EventTarget {
     /** @type {'inactive'|'readyToInit'|'encoding'|'closed'} */
     this.workerState = 'inactive';
 
-    this._initWorker();
+    // Parse MIME Type
+    if (!MediaRecorder.isTypeSupported(this._mimeType)) {
+      throw new TypeError('invalid arguments, a MIME Type is not supported');
+    }
+    switch (MediaRecorder._parseType(this._mimeType).subtype) {
+      case 'wave':
+      case 'wav':
+        this._mimeType = 'audio/wave';
+        this._wasmPath = ''; // wasm is not used
+        break;
+
+      case 'webm':
+        this._mimeType = 'audio/webm';
+        this._wasmPath = WebMOpusEncoderWasmPath || '';
+        break;
+
+      case 'ogg':
+      default:
+        this._mimeType = 'audio/ogg';
+        this._wasmPath = OggOpusEncoderWasmPath || '';
+        break;
+    }
+
+    // Spawn a encoder worker
+    this._workerFactory = typeof encoderWorkerFactory === 'function'
+                            ? encoderWorkerFactory
+                            : _ => new Worker('./encoderWorker.umd.js');
+    this._spawnWorker();
 
     // Get channel count and sampling rate
     // channelCount: https://www.w3.org/TR/mediacapture-streams/#media-track-settings
@@ -101,42 +148,15 @@ class MediaRecorder extends EventTarget {
 
   /**
    * Initialize worker
-   * @param {string} mimeType - Optional and currently not used. Use this if
-   *                            a different mimeType other than this.mimeType needed.
    */
-  _initWorker (mimeType = undefined) {
-    if (typeof mimeType === 'undefined') {
-      mimeType = this._mimeType;
-    }
-
-    // Parse MIME Type
-    if (!MediaRecorder.isTypeSupported(mimeType)) {
-      throw new TypeError('invalid arguments, a MIME Type is not supported');
-    }
-
-    // Initialize worker
-    switch (MediaRecorder._parseType(mimeType).subtype) {
-      case 'wave':
-      case 'wav':
-        // TODO: try using type: 'module' when borwsers start supporting
-        this.worker = new Worker(scriptDirectory + 'WaveWorker.js');
-        break;
-
-      case 'webm':
-        this.worker = new Worker(scriptDirectory + 'WebMOpusWorker.js');
-        this._mimeType = 'audio/webm';
-        break;
-
-      case 'ogg':
-      default:
-        this.worker = new Worker(scriptDirectory + 'OggOpusWorker.js');
-        this._mimeType = 'audio/ogg';
-        break;
-    }
-
+  _spawnWorker () {
+    this.worker = this._workerFactory();
     this.worker.onmessage = (e) => this._onmessageFromWorker(e);
     this.worker.onerror = (e) => this._onerrorFromWorker(e);
-    this.workerState = 'inactive';
+
+    this._postMessageToWorker('loadEncoder',
+                              { mimeType: this._mimeType,
+                                wasmPath: this._wasmPath });
   }
 
   /**
@@ -146,6 +166,11 @@ class MediaRecorder extends EventTarget {
    */
   _postMessageToWorker (command, message = {}) {
     switch (command) {
+      case 'loadEncoder':
+        let { mimeType, wasmPath } = message;
+        this.worker.postMessage({ command, mimeType, wasmPath });
+        break;
+
       case 'init':
         // Initialize the worker
         let { sampleRate, channelCount, bitsPerSecond } = message;
@@ -182,7 +207,7 @@ class MediaRecorder extends EventTarget {
 
       default:
         // This is an error case
-        break;
+        throw new Error('Internal Error: Incorrect postMessage requested.');
     }
   }
 
@@ -302,7 +327,7 @@ class MediaRecorder extends EventTarget {
 
     // Check worker is closed (usually by stop()) and init.
     if (this.workerState === 'closed') {
-      this._initWorker();
+      this._spawnWorker();
     }
 
     this._state = 'recording';
@@ -483,4 +508,4 @@ if (/Edge/.test(navigator.userAgent)) {
   })();
 }
 
-export default MediaRecorder;
+module.exports = { default: MediaRecorder };
