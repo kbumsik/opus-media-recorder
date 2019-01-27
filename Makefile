@@ -17,9 +17,9 @@ DIST_DIR := dist
 DOCS_DIR := docs
 
 # Expected files
-OUTPUT_FILES = MediaRecorder.js WaveWorker.js \
-				OggOpusWorker.js OggOpusWorker.wasm \
-				WebMOpusWorker.js WebMOpusWorker.wasm \
+OUTPUT_FILES = MediaRecorder.js WaveEncoder.js \
+				OggOpusEncoder.js OggOpusEncoder.wasm \
+				WebMOpusEncoder.js WebMOpusEncoder.wasm \
 				encoderWorker.js
 
 # Add UMD libraries
@@ -36,7 +36,7 @@ ifdef PRODUCTION
 else
 	# Development only section
 	# Debugging map files
-	OUTPUT_FILES += OggOpusWorker.wasm.map WebMOpusWorker.wasm.map
+	OUTPUT_FILES += OggOpusEncoder.wasm.map WebMOpusEncoder.wasm.map
 endif
 
 
@@ -111,12 +111,12 @@ export WEBM_OBJ = $(LIB_BUILD_DIR)/libwebm.a
 OBJS = $(OPUS_OBJ) $(OGG_OBJ) $(SPEEX_OBJ) $(WEBM_OBJ)
 
 # emcc targets
-EMCC_OGG_OPUS_JS = $(BUILD_DIR)/OggOpusWorker.js
-EMCC_WEBM_OPUS_JS = $(BUILD_DIR)/WebMOpusWorker.js
+EMCC_OGG_OPUS_JS = $(BUILD_DIR)/OggOpusEncoder.js
+EMCC_WEBM_OPUS_JS = $(BUILD_DIR)/WebMOpusEncoder.js
 
 # emcc target source files
-SRC_OGG_OPUS_JS = $(SRC_DIR)/OggOpusWorker.js
-SRC_WEBM_OPUS_JS = $(SRC_DIR)/WebMOpusWorker.js
+SRC_OGG_OPUS_JS = $(SRC_DIR)/OggOpusEncoder.js
+SRC_WEBM_OPUS_JS = $(SRC_DIR)/WebMOpusEncoder.js
 
 ###########
 # Targets #

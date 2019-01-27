@@ -1,7 +1,7 @@
 #include "WebMContainer.hpp"
 #include <string>
 #include <cstring>
-#include "EmscriptenJSWriter.hpp"
+#include "emscriptenImport.hpp"
 
 // See OggContainer::produceIDPage for more detail
 enum {
@@ -46,7 +46,7 @@ WebMContainer::~WebMContainer()
 }
 
 mkvmuxer::int32 WebMContainer::Write(const void* buf, mkvmuxer::uint32 len) {
-  queueBuffer(buf, len);
+  emscriptenPushBuffer(buf, len);
   position_ += len;
   return 0;
 }

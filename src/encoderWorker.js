@@ -1,7 +1,7 @@
 'use strict';
-const WaveEncoder = require('./WaveWorker.js');
-const WebMOpusEncoder = require('./WebMOpusWorker.js');
-const OggOpusEncoder = require('./OggOpusWorker.js');
+const WaveEncoder = require('./WaveEncoder.js');
+const WebMOpusEncoder = require('./WebMOpusEncoder.js');
+const OggOpusEncoder = require('./OggOpusEncoder.js');
 
 let encoder;
 

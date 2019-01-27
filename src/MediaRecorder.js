@@ -31,10 +31,10 @@ class MediaRecorder extends EventTarget {
    *          and returns it. function(){return new Worker('./encoderWorker.umd.js')}
    *          is used by default. This is NON-STANDARD.
    * @param {string} [workerOptions.OggOpusEncoderWasmPath]
-   *          Path of ./OggOpusWorker.wasm which is used for OGG Opus encoding
+   *          Path of ./OggOpusEncoder.wasm which is used for OGG Opus encoding
    *          by the encoder worker. This is NON-STANDARD.
    * @param {string} [workerOptions.WebMOpusEncoderWasmPath]
-   *          Path of ./WebMOpusWorker.wasm which is used for WebM Opus encoding
+   *          Path of ./WebMOpusEncoder.wasm which is used for WebM Opus encoding
    *          by the encoder worker. This is NON-STANDARD.
    */
   constructor (stream, options = {}, workerOptions = {}) {
