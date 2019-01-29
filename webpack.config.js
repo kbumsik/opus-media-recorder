@@ -1,6 +1,6 @@
 module.exports = {
   "entry": {
-    MediaRecorder: "./src/MediaRecorder.js"
+    OpusMediaRecorder: "./src/OpusMediaRecorder.js"
   },
   "mode": "development",
   "output": {

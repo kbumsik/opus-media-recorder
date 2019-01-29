@@ -42,9 +42,14 @@ buttonCreate.onclick = () => {
 };
 
 function createMediaRecorder (stream) {
+  // workerOptions is NON-STANDARD option.
+  let workerOptions = {
+    OggOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/dist/OggOpusEncoder.wasm',
+    WebMOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/dist/WebMOpusEncoder.wasm'
+  };
   // Create recorder object
-  let config = { mimeType: mimeSelectValue };
-  recorder = new MediaRecorder(stream, config);
+  let options = { mimeType: mimeSelectValue };
+  recorder = new MediaRecorder(stream, options, workerOptions);
 
   let dataChunks = [];
   // Recorder Event Handlers
@@ -98,9 +103,12 @@ function initButtons () {
 // Overriding console.log
 document.addEventListener('DOMContentLoaded', _ => {
   // Check compability
-  if (window.MediaRecorder === undefined) {
-    console.error('No MediaRecorder found');
+  if (window.OpusMediaRecorder === undefined) {
+    console.error('No OpusMediaRecorder found');
   } else {
+    // Polyfill MediaRecorder
+    window.MediaRecorder = window.OpusMediaRecorder;
+    // Check available content types
     let contentTypes = [
       'audio/wave',
       'audio/wav',

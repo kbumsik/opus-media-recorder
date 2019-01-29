@@ -129,7 +129,7 @@ Browsers with issues:
 
 ## How to build
 
-1. To build from the source, you need [Emscripten](https://github.com/kripken/emscripten), [NPM](https://www.npmjs.com/), Python 2.7 or higher, and basic C program build systems such as [GNU Make](https://www.gnu.org/software/make/).
+1. To build from the source, you need [Emscripten](https://github.com/kripken/emscripten) version 1.38.25, [NPM](https://www.npmjs.com/), [npx](https://www.npmjs.com/package/npx), Python 2.7 or higher, and basic C program build systems such as [GNU Make](https://www.gnu.org/software/make/). Environment variable `$EMSCRIPEN` must be set in order to build.
 
 2. `npm install` to install JavaScript dependencies.
 

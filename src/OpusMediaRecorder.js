@@ -7,7 +7,7 @@ const BUFFER_SIZE = 4096;
  * Reference: https://w3c.github.io/mediacapture-record/#mediarecorder-api
  * @extends EventTarget
  */
-class MediaRecorder extends EventTarget {
+class OpusMediaRecorder extends EventTarget {
   /**
    * A function that returns the encoder web worker
    * @name workerFactory
@@ -52,10 +52,10 @@ class MediaRecorder extends EventTarget {
     this.workerState = 'inactive';
 
     // Parse MIME Type
-    if (!MediaRecorder.isTypeSupported(this._mimeType)) {
+    if (!OpusMediaRecorder.isTypeSupported(this._mimeType)) {
       throw new TypeError('invalid arguments, a MIME Type is not supported');
     }
-    switch (MediaRecorder._parseType(this._mimeType).subtype) {
+    switch (OpusMediaRecorder._parseType(this._mimeType).subtype) {
       case 'wave':
       case 'wav':
         this._mimeType = 'audio/wave';
@@ -74,10 +74,24 @@ class MediaRecorder extends EventTarget {
         break;
     }
 
+    // Get current directory for worker
+    let workerDir = '';
+    if (document.currentScript) {
+      workerDir = document.currentScript.src;
+    } else if (self.location) {
+      workerDir = self.location.href;
+    }
+    workerDir = workerDir.substr(0, workerDir.lastIndexOf('/')) +
+                '/encoderWorker.umd.js';
+    // If worker function is imported via <script> tag, make it blob to get URL.
+    if (typeof OpusMediaRecorder.encoderWorker === 'function') {
+      workerDir = URL.createObjectURL(new Blob([`(${OpusMediaRecorder.encoderWorker})()`]));
+    }
+
     // Spawn a encoder worker
     this._workerFactory = typeof encoderWorkerFactory === 'function'
                             ? encoderWorkerFactory
-                            : _ => new Worker('./encoderWorker.umd.js');
+                            : _ => new Worker(workerDir);
     this._spawnWorker();
 
     // Get channel count and sampling rate
@@ -119,7 +133,7 @@ class MediaRecorder extends EventTarget {
   }
 
   /**
-   * The current state of the MediaRecorder object. When the MediaRecorder
+   * The current state of the OpusMediaRecorder object. When the OpusMediaRecorder
    * is created, the UA MUST set this attribute to inactive.
    * @return {"inactive"|"recording"|"paused"}
    */
@@ -279,7 +293,7 @@ class MediaRecorder extends EventTarget {
 
   /**
    * Enable onaudioprocess() callback.
-   * @param {number} timeslice - In seconds. MediaRecorder should request data
+   * @param {number} timeslice - In seconds. OpusMediaRecorder should request data
    *                              from the worker every timeslice seconds.
    */
   _enableAudioProcessCallback (timeslice) {
@@ -425,7 +439,7 @@ class MediaRecorder extends EventTarget {
       return true;
     }
     try {
-      var {type, subtype, codec} = MediaRecorder._parseType(mimeType);
+      var {type, subtype, codec} = OpusMediaRecorder._parseType(mimeType);
     } catch (error) {
       // 2. If not a valid string, return false.
       return false;
@@ -494,7 +508,7 @@ class MediaRecorder extends EventTarget {
   'pause', // Called to handle the pause event.
   'resume', // Called to handle the resume event.
   'error' // Called to handle a MediaRecorderErrorEvent.
-].forEach(name => defineEventAttribute(MediaRecorder.prototype, name));
+].forEach(name => defineEventAttribute(OpusMediaRecorder.prototype, name));
 
 // MS Edge specific monkey patching:
 // onaudioprocess callback cannot be triggered more than twice when postMessage
@@ -508,4 +522,4 @@ if (/Edge/.test(navigator.userAgent)) {
   })();
 }
 
-module.exports = { default: MediaRecorder };
+module.exports = { default: OpusMediaRecorder };

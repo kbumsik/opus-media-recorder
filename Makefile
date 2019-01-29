@@ -17,15 +17,15 @@ DIST_DIR := dist
 DOCS_DIR := docs
 
 # Expected files
-OUTPUT_FILES = MediaRecorder.js WaveEncoder.js \
+OUTPUT_FILES = OpusMediaRecorder.js WaveEncoder.js \
 				OggOpusEncoder.js OggOpusEncoder.wasm \
 				WebMOpusEncoder.js WebMOpusEncoder.wasm \
-				encoderWorker.js
+				encoderWorker.js commonFunctions.js
 
 # Add UMD libraries
 OUTPUT_FILES_JS := $(filter %.js, $(OUTPUT_FILES))
 # OUTPUT_FILES += $(OUTPUT_FILES_JS:%.js=%.umd.js)
-OUTPUT_FILES += MediaRecorder.umd.js encoderWorker.umd.js
+OUTPUT_FILES += OpusMediaRecorder.umd.js encoderWorker.umd.js
 
 FINAL_TARGETS_BUILD = $(addprefix $(BUILD_DIR)/,$(OUTPUT_FILES))
 
@@ -41,7 +41,11 @@ endif
 
 
 # This is the final targets, what "make" command builds
-all : $(FINAL_TARGETS_BUILD) $(FINAL_TARGETS_DIST) $(FINAL_TARGETS_DOCS)
+all : check_emcc $(FINAL_TARGETS_BUILD) $(FINAL_TARGETS_DIST) $(FINAL_TARGETS_DOCS)
+
+ifndef EMSCRIPTEN
+  $(error EMSCRIPTEN is undefined. Enable Escripten SDK.)
+endif
 
 ################################################################################
 # 1. Emscripten compilation
@@ -175,12 +179,19 @@ endif
 $(BUILD_DIR)/%.js: $(SRC_DIR)/%.js $(BUILD_DIR)
 	cp $< $@
 
-# 2.2 Build Web Workers to /build
+# 2.2 UMD library
 $(BUILD_DIR)/%.umd.js: $(BUILD_DIR)/%.js $(BUILD_DIR)/commonFunctions.js
 	npm run webpack -- --config webpack.config.js \
 						$(NPM_FLAGS) \
 						--output-library $(basename $(notdir $<)) \
 						--output-library-target umd \
+						$< \
+						-o $@
+
+# 2.2 UMD Web Worker
+$(BUILD_DIR)/%Worker.umd.js: $(BUILD_DIR)/%Worker.js $(BUILD_DIR)/commonFunctions.js
+	npm run webpack -- --config webpack.worker.config.js \
+						$(NPM_FLAGS) \
 						$< \
 						-o $@
 
@@ -206,7 +217,23 @@ all: $(addprefix $(BUILD_DIR)/, $(DOCS_FILES))
 # etc.
 ################################################################################
 
-.PHONY : all run clean-lib clean-js clean
+.PHONY : all check_emcc run clean-lib clean-js clean
+
+cc_version = $(shell $(1) --version | head -n1 | cut -d" " -f5)
+
+define check_version
+	@if test "$$(printf '%s\n' "$(1)" "$(2)" | sort -V | head -n 1)" != "$(1)"; then \
+		exit 0; \
+	else \
+		echo $(3); \
+		exit 1; \
+	fi
+endef
+
+check_emcc:
+	@which emcc > /dev/null
+	@echo Building with emcc version: $(call cc_version, emcc)
+	$(call check_version, $(call cc_version, emcc), 1.38.24, 'emcc(emscripten) version must be 1.38.25 or higher')
 
 $(BUILD_DIR) $(LIB_BUILD_DIR):
 	mkdir -p $@
