@@ -522,4 +522,4 @@ if (/Edge/.test(navigator.userAgent)) {
   })();
 }
 
-module.exports = { default: OpusMediaRecorder };
+module.exports = OpusMediaRecorder;

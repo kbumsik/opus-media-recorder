@@ -1,8 +1,7 @@
 # # Building process
 # 	1. Compile C/C++ codes and libraries using Emscripten.
-#   2. Packing JS files as UMD using webpack.
-#   3. Copy example files (/docs/index.html) to /build, for test running.
-#        If PRODUCTION=1 is set, copy them to /dist and /docs
+#   2. Packing JS files as UMD using webpack.docs
+#   3. Copy files to $(DIST)
 
 # Change the port you like. You can run the dev server by using "make run"
 DEV_SERVER_PORT := 9000
@@ -13,8 +12,7 @@ SRC_DIR := src
 # This is used by /lib/Makefile
 export BUILD_DIR := $(abspath build)
 export LIB_BUILD_DIR := $(abspath $(BUILD_DIR)/emscripten)
-DIST_DIR := dist
-DOCS_DIR := docs
+DIST_DIR := .
 
 # Expected files
 OUTPUT_FILES = OpusMediaRecorder.js WaveEncoder.js \
@@ -23,16 +21,17 @@ OUTPUT_FILES = OpusMediaRecorder.js WaveEncoder.js \
 				encoderWorker.js commonFunctions.js
 
 # Add UMD libraries
-OUTPUT_FILES_JS := $(filter %.js, $(OUTPUT_FILES))
-# OUTPUT_FILES += $(OUTPUT_FILES_JS:%.js=%.umd.js)
 OUTPUT_FILES += OpusMediaRecorder.umd.js encoderWorker.umd.js
 
 FINAL_TARGETS_BUILD = $(addprefix $(BUILD_DIR)/,$(OUTPUT_FILES))
 
 ifdef PRODUCTION
 	# Production only section
-	FINAL_TARGETS_DIST = $(addprefix $(DIST_DIR)/,$(OUTPUT_FILES))
-	FINAL_TARGETS_DOCS = $(addprefix $(DOCS_DIR)/,$(OUTPUT_FILES))
+	# .bin files - Some bundlers needs extension other than .wasm
+	OUTPUT_FILES_WASM := $(filter %.wasm, $(OUTPUT_FILES))
+	OUTPUT_FILES_BIN = $(OUTPUT_FILES_WASM:%.wasm=%.bin)
+	# Production only files: dist
+	FINAL_TARGETS_DIST = $(addprefix $(DIST_DIR)/,$(OUTPUT_FILES) $(OUTPUT_FILES_BIN))
 else
 	# Development only section
 	# Debugging map files
@@ -41,11 +40,8 @@ endif
 
 
 # This is the final targets, what "make" command builds
-all : check_emcc $(FINAL_TARGETS_BUILD) $(FINAL_TARGETS_DIST) $(FINAL_TARGETS_DOCS)
+all : check_emcc $(FINAL_TARGETS_BUILD) $(FINAL_TARGETS_DIST)
 
-ifndef EMSCRIPTEN
-  $(error EMSCRIPTEN is undefined. Enable Escripten SDK.)
-endif
 
 ################################################################################
 # 1. Emscripten compilation
@@ -199,25 +195,21 @@ $(BUILD_DIR)/%Worker.umd.js: $(BUILD_DIR)/%Worker.js $(BUILD_DIR)/commonFunction
 # 3. Production files
 ################################################################################
 
-$(FINAL_TARGETS_DIST) $(FINAL_TARGETS_DOCS): $(FINAL_TARGETS_BUILD)
-	cp $(BUILD_DIR)/$(notdir $@) $@
+$(DIST_DIR)/%: $(BUILD_DIR)/%
+	cp $< $@
 
-################################################################################
-# Development settings
-################################################################################
-# Development server setting
-DOCS_FILES = debuggingHelper.js example.js index.html
-
-$(addprefix $(BUILD_DIR)/, $(DOCS_FILES)): $(addprefix $(DOCS_DIR)/, $(DOCS_FILES))
-	cp $(DOCS_DIR)/$(notdir $@) $@
-
-all: $(addprefix $(BUILD_DIR)/, $(DOCS_FILES))
+$(DIST_DIR)/%.bin: $(BUILD_DIR)/%.wasm
+	cp $< $@
 
 ################################################################################
 # etc.
 ################################################################################
 
 .PHONY : all check_emcc run clean-lib clean-js clean
+
+ifndef EMSCRIPTEN
+  $(error EMSCRIPTEN is undefined. Enable Escripten SDK.)
+endif
 
 cc_version = $(shell $(1) --version | head -n1 | cut -d" " -f5)
 
@@ -246,9 +238,7 @@ clean-lib:
 
 clean-js:
 	-rm -rf $(BUILD_DIR) WebIDLGrammar.pkl parser.out
-	# Revert tracked files
-	git checkout HEAD -- $(DIST_DIR) $(DOCS_DIR)
-	# Removed untracked files too
-	git clean -df $(DIST_DIR) $(DOCS_DIR)
+	# Revert tracked dist files
+	git clean -df $(FINAL_TARGETS_DIST)
 
 clean: clean-lib clean-js

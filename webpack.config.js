@@ -4,8 +4,7 @@ module.exports = {
   },
   mode: 'development',
   output: {
-    globalObject: 'typeof self !== \'undefined\' ? self : this',
-    libraryExport: 'default'
+    globalObject: 'typeof self !== \'undefined\' ? self : this'
   },
   module: {
     rules: [
@@ -31,7 +30,7 @@ module.exports = {
     ]
   },
   devServer: {
-    contentBase: [`${__dirname}/build`, __dirname],
+    contentBase: [`${__dirname}/build`, `${__dirname}/docs`],
     compress: true,
     host: '0.0.0.0',
     port: 9000,

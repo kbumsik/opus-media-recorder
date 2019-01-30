@@ -1,6 +1,20 @@
-node_modules/
+**/node_modules/
 package-lock.json
 build/
+# Dist files
+OpusMediaRecorder.js
+OpusMediaRecorder.umd.js
+encoderWorker.js
+encoderWorker.umd.js
+OggOpusEncoder.js
+OggOpusEncoder.wasm
+OggOpusEncoder.bin
+WebMOpusEncoder.js
+WebMOpusEncoder.wasm
+WebMOpusEncoder.bin
+WaveEncoder.js
+commonFunctions.js
+
 # WebIDL parsing files
 WebIDLGrammar.pkl
 parser.out

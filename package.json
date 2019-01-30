@@ -1,13 +1,17 @@
 {
   "name": "opus-media-recorder",
-  "version": "0.7.7",
+  "version": "0.7.9",
   "author": "Bumsik Kim",
   "license": "MIT",
   "homepage": "https://github.com/kbumsik/opus-media-recorder",
   "description": "MedialRecorer polyfill for Opus recording using WebAssembly",
-  "main": "dist/OpusMediaRecorder.js",
+  "main": "OpusMediaRecorder.js",
   "files": [
-    "dist/*"
+    "OpusMediaRecorder.js", "OpusMediaRecorder.umd.js",
+    "encoderWorker.js", "encoderWorker.umd.js",
+    "OggOpusEncoder.js", "OggOpusEncoder.wasm", "OggOpusEncoder.bin",
+    "WebMOpusEncoder.js", "WebMOpusEncoder.wasm", "WebMOpusEncoder.bin",
+    "WaveEncoder.js", "commonFunctions.js"
   ],
   "repository": {
     "type": "git",

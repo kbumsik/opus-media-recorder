@@ -44,8 +44,8 @@ buttonCreate.onclick = () => {
 function createMediaRecorder (stream) {
   // workerOptions is NON-STANDARD option.
   let workerOptions = {
-    OggOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/dist/OggOpusEncoder.wasm',
-    WebMOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/dist/WebMOpusEncoder.wasm'
+    OggOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/OggOpusEncoder.wasm',
+    WebMOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/WebMOpusEncoder.wasm'
   };
   // Create recorder object
   let options = { mimeType: mimeSelectValue };
