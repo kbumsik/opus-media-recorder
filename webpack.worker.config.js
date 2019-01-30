@@ -1,4 +1,4 @@
-const WrapperPlugin = require("wrapper-webpack-plugin");
+const WrapperPlugin = require('wrapper-webpack-plugin');
 
 /**
  * The purpose of this function is to create the header and footer for IIFEed
@@ -28,41 +28,41 @@ module.exports = {
       afterOptimizations: true,
       test: /\.js$/, // only wrap output of bundle files with '.js' extension
       // (function () { function initWorker (){
-      header: "(" +
+      header: '(' +
               wrapperStr.substr(
                 0, wrapperStr.indexOf(
-                  "{", wrapperStr.indexOf("initWorker")) + 1) +
-              "\n",
+                  '{', wrapperStr.indexOf('initWorker')) + 1) +
+              '\n',
       //   } if (typeof window !== 'undefined'...
       //   ...
       // })();
-      footer: "\n" +
-              wrapperStr.substr(wrapperStr.indexOf("}")) +
-              ")();"
+      footer: '\n' +
+              wrapperStr.substr(wrapperStr.indexOf('}')) +
+              ')();'
     })
   ],
   entry: {
-    encoderWorker: "./src/encoderWorker.js"
+    encoderWorker: './src/encoderWorker.js'
   },
-  mode: "development",
+  mode: 'development',
   module: {
     rules: [
       {
-        enforce: "pre",
+        enforce: 'pre',
         test: /\.(js|jsx|mjs)$/,
         exclude: [
           /node_modules/,
           /build/
         ],
-        use: "eslint-loader"
+        use: 'eslint-loader'
       },
       {
         test: /\.m?js$/,
         exclude: /(node_modules|bower_components)/,
         use: {
-          loader: "babel-loader",
+          loader: 'babel-loader',
           options: {
-            presets: ["@babel/preset-env"]
+            presets: ['@babel/preset-env']
           }
         }
       }

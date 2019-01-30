@@ -1,30 +1,30 @@
 module.exports = {
-  "entry": {
-    OpusMediaRecorder: "./src/OpusMediaRecorder.js"
+  entry: {
+    OpusMediaRecorder: './src/OpusMediaRecorder.js'
   },
-  "mode": "development",
-  "output": {
-    "globalObject": "typeof self !== \'undefined\' ? self : this",
-    "libraryExport": "default"
+  mode: 'development',
+  output: {
+    globalObject: 'typeof self !== \'undefined\' ? self : this',
+    libraryExport: 'default'
   },
-  "module": {
-    "rules": [
+  module: {
+    rules: [
       {
-        "enforce": "pre",
-        "test": /\.(js|jsx|mjs)$/,
-        "exclude": [
+        enforce: 'pre',
+        test: /\.(js|jsx|mjs)$/,
+        exclude: [
           /node_modules/,
           /build/
         ],
-        "use": "eslint-loader"
+        use: 'eslint-loader'
       },
       {
         test: /\.m?js$/,
         exclude: /(node_modules|bower_components)/,
         use: {
-          loader: "babel-loader",
+          loader: 'babel-loader',
           options: {
-            presets: ["@babel/preset-env"]
+            presets: ['@babel/preset-env']
           }
         }
       }
@@ -33,10 +33,10 @@ module.exports = {
   devServer: {
     contentBase: [`${__dirname}/build`, __dirname],
     compress: true,
-    host: "0.0.0.0",
+    host: '0.0.0.0',
     port: 9000,
     https: true,
-    index: "index.html",
+    index: 'index.html',
     overlay: {
       warnings: true,
       errors: true

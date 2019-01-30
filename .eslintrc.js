@@ -23,13 +23,5 @@ module.exports = {
   },
   "env": {
     "browser": true
-  },
-  "overrides": [
-    {
-      "files": [ "*.config.js"],
-      "rules": {
-        "quotes": ["error", "double"]
-      }
-    }
-  ]
+  }
 };
