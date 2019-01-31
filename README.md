@@ -38,36 +38,70 @@ opus-media-recorder is compatible with the [Mediastream Recording API](https://d
   * You can get an Opus decorder to play it. There are Opus decoders available, such as [Chris Rudmin's Opus decoder](https://github.com/chris-rudmin/opus-recorder).
   * Otherwise, users can download as a file and play it using apps like [VLC](https://www.videolan.org/vlc/index.html).
 
-### HTML
-
-The `MediaRecorder` object is available in the global namespace using [UMD](https://github.com/umdjs/umd).
-
-```javascript
-<script src="path/to/MediaRecorder.js"></script>
-<script>
-...
-// Existing MediaRecorder is replaced
-var recorder = new MediaRecorder(stream);
-...
-</script>
-```
-
 ### JavaScript
 
-For futher usages, see the [MDN reference](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder), our [example](docs), and other online resources.
+For standard usages of `MediaRecorder`, see the [MDN reference](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) and other online resources. Our [testing website](docs) and [example section](example) may be useful as well.
+#### Installation
+
+```bash
+npm install --save-dev opus-media-recorder
+```
+
+#### Working with a bundler
+
+Because `opus-media-recorder` needs to load a dedicated web worker and `.wasm` binaries, special configurations are necessary. In general:
 
 ```javascript
-window.MediaRecorder = require('opus-media-recorder');
+import OpusMediaRecorder from 'opus-media-recorder';
+// Choose desired format like audio/webm. Default is audio/ogg
+const options = { mimeType: 'audio/ogg' }
 
-var recorder;
+// Web worker and .wasm configuration. Note: This is NOT a part of W3C standard.
+const workerOptions = {
+  encoderWorkerFactory: function () {
+    return new Worker('.../path/to/opus-media-recorder/encoderWorker.js')
+  },
+  OggOpusEncoderWasmPath: '.../path/to/opus-media-recorder/OggOpusEncoder.wasm',
+  WebMOpusEncoderWasmPath: '.../path/to/opus-media-recorder/WebMOpusEncoder.wasm'
+};
+
+window.MediaRecorder = OpusMediaRecorder;
+recorder = new MediaRecorder(stream, options, workerOptions);
+```
+
+Bundler-specific examples:
+
+* [Webpack](example/webpack)
+* [Rollup](example/rollup)
+* [Browserify](example/browserify)
+
+#### Simple JavaScript example (webpack)
+
+```javascript
+import OpusMediaRecorder from 'opus-media-recorder';
+// Use worker-loader
+import Worker from 'worker-loader!opus-media-recorder/encoderWorker.js';
+// You should use file-loader in webpack.config.js.
+// See webpack example link in the above section for more detail.
+import OggOpusWasm from 'opus-media-recorder/OggOpusEncoder.wasm';
+import WebMOpusWasm from 'opus-media-recorder/WebMOpusEncoder.wasm';
+
+// Non-standard options
+const workerOptions = {
+  encoderWorkerFactory: _ => new Worker(),
+  OggOpusEncoderWasmPath: OggOpusWasm,
+  WebMOpusEncoderWasmPath: WebMOpusWasm
+};
+
+window.MediaRecorder = OpusMediaRecorder;
+
+let recorder;
 
 function startRecording () {
-  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-    var option = {
-      mimeType: 'audio/ogg' // Choose desired format. Default is audio/ogg
-    }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    let options = { mimeType: 'audio/ogg' };
     // Start recording
-    recorder = new MediaRecorder(stream, option);
+    recorder = new MediaRecorder(stream, options, workerOptions);
     recorder.start();
     // Set record to <audio> when recording will be finished
     recorder.addEventListener('dataavailable', (e) => {
@@ -87,16 +121,43 @@ stopButton.addEventListener('click', () => {
 })
 ```
 
+### HTML `<script>` tag
+
+The `OpusMediaRecorder` object is available in the global namespace using [UMD](https://github.com/umdjs/umd).
+
+```html
+<!-- load OpusMediaRecorder.umd.js. OpusMediaRecorder will be loaded. -->
+<script src="https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/OpusMediaRecorder.umd.js"></script>
+<!-- load encoderWorker.umd.js. This should be after OpusMediaRecorder. -->
+<!-- OpusMediaRecorder.encoderWorker will be loaded. -->
+<script src="https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/encoderWorker.umd.js"></script>
+
+<script>
+...
+// If you loaded encoderWorker.js using <script> tag,
+// you don't need to define encoderWorkerFactory.
+const workerOptions = {
+  OggOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/OggOpusEncoder.wasm',
+  WebMOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/WebMOpusEncoder.wasm'
+};
+
+// Existing MediaRecorder is replaced
+window.MediaRecorder = OpusMediaRecorder;
+let recorder = new MediaRecorder(stream, {}, workerOptions);
+...
+</script>
+```
+
 ### Use opus-media-recorder only when a browser doesn't support it
 
 ```javascript
 // Check if MediaRecorder available.
 if (!window.MediaRecorder) {
-  window.MediaRecorder = require('opus-media-recorder');
+  window.MediaRecorder = OpusMediaRecorder;
 }
 // Check if a target format (e.g. audio/ogg) is supported.
 else if (!window.MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
-  window.MediaRecorder = require('opus-media-recorder');
+  window.MediaRecorder = OpusMediaRecorder;
 }
 ```
 
