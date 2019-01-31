@@ -14,6 +14,11 @@ WebMOpusEncoder.wasm
 WebMOpusEncoder.bin
 WaveEncoder.js
 commonFunctions.js
+# Output files in example
+example/*/app.js
+example/*/*.worker.js
+example/*/*.wasm
+
 
 # WebIDL parsing files
 WebIDLGrammar.pkl
