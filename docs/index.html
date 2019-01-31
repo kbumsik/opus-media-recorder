@@ -1,6 +1,3 @@
-<!-- I'm following the BEM standard for styling.
-For more info, go to http://getbem.com/ -->
-
 <html>
   <head>
     <!-- Global Site Tag (gtag.js) - Google Analytics -->
@@ -20,95 +17,8 @@ For more info, go to http://getbem.com/ -->
     <!-- For mobile -->
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>opus-media-recorder Example</title>
+    <link href="main.css" rel="stylesheet">
     <style>
-      html,
-      body {
-        text-align: center;
-        max-width: 600px;
-        margin: auto;
-        font-family: sans-serif;
-        background-color: #f0f2f5 !important;
-      }
-
-      .card {
-        margin: 10px;
-        padding: 10px;
-        background-color: #ffffff;
-      }
-
-      .card header h3 {
-        text-align: left;
-        margin: 6px 8px;
-      }
-
-      .card div {
-        margin: 2px;
-      }
-
-      .description,
-      .note {
-        text-align: left;
-        margin: 12px;
-      }
-
-      .note {
-        font-size: small;
-      }
-
-      .controller {
-        position: -webkit-sticky;
-        position: sticky;
-        top: 40px;
-        z-index: 10;
-      }
-
-      .mime-select {
-        width: 120px;
-      }
-
-      .timeslice-input {
-        width: 100px;
-      }
-
-      .buttons {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 5px;
-      }
-
-      .github-corner {
-        position: -webkit-sticky;
-        position: sticky;
-        top: 0px;
-        z-index: 10;
-        background-color: #151513;
-        color: #ffffff;
-        text-decoration: none;
-        display: flex;
-        align-content: flex-end;
-        justify-content: flex-end;
-        flex-direction: row;
-        white-space: nowrap;
-        overflow: hidden;
-        height: 40px;
-      }
-
-      .github-corner span {
-        margin-top: 10px;
-      }
-
-      .github-corner :last-child {
-        margin-right: 3%;
-      }
-
-      .log {
-        font-family: monospace;
-        text-align: left;
-        white-space: pre;
-        overflow-x: auto;
-        font-size: 12px;
-      }
     </style>
   </head>
 
@@ -117,46 +27,7 @@ For more info, go to http://getbem.com/ -->
     <a class="github-corner"
       href="https://github.com/kbumsik/opus-media-recorder"
       aria-label="View source on GitHub">
-      <style>
-        .github-corner svg {
-          color:#ffffff;
-          fill:#151513;
-        }
-
-        .github-corner .octo-arm {
-          transform-origin: 50% 85%;
-        }
-
-        @media (hover: hover) {
-          .github-corner:hover .octo-arm {
-            animation:octocat-wave 5600ms ease-in-out;
-            animation-iteration-count: infinite;
-          }
-        }
-
-        @media (hover: none) {
-          .github-corner .octo-arm {
-            animation:octocat-wave 5600ms ease-in-out;
-            animation-iteration-count: infinite;
-          }
-        }
-
-        @keyframes octocat-wave {
-          0%,
-          10%,
-          100% {
-            transform:rotate(0)
-          }
-          2%,
-          6% {
-            transform:rotate(-25deg)
-          }
-          4%,
-          8% {
-            transform:rotate(10deg)
-          }
-        }
-      </style>
+      <link href="octocat.css" rel="stylesheet">
       <span>Fork me on GitHub!</span>
       <svg aria-hidden="true"
         viewBox="0 0 125 125"
@@ -204,7 +75,7 @@ For more info, go to http://getbem.com/ -->
         <div>
           <label for="mimeSelect">MIME Type</label>
           <select id="mimeSelect" class="mime-select">
-            <option value="">default</option>
+            <option value="">default (audio/ogg)</option>
             <option value="audio/ogg">audio/ogg</option>
             <option value="audio/webm">audio/webm</option>
             <option value="audio/wave">audio/wave</option>
