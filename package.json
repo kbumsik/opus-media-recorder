@@ -37,8 +37,10 @@
     "Wave"
   ],
   "scripts": {
+    "build": "make",
+    "build:production": "make PRODUCTION=1",
     "webpack": "webpack-cli",
-    "start": "webpack-dev-server",
+    "serve": "webpack-dev-server",
     "clean": "make clean"
   },
   "dependencies": {

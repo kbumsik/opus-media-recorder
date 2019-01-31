@@ -14,7 +14,7 @@
 | `audio/webm` |          O          |    O   |    X    |  X  |   X  |
 | `audio/wav`  |          O          |    X   |    X    |  X  |   X  |
 
-\* Both `audio/ogg` and `audio/webm` refer containers with Opus audio codec.
+\* Both `audio/ogg` and `audio/webm` refer containers for Opus audio codec.
 
 Currently the MediaRecorder API suffers from the two problems:
 
@@ -133,8 +133,8 @@ Browsers with issues:
 
 2. `npm install` to install JavaScript dependencies.
 
-3. `make all` to build. `PRODUCTION=1 make all` to build for production.
+3. `npm run build` to build. `npm run build:production` to build files for distribution.
 
-4. `make run` to run a test web server locally. Default URL is `https://localhost:9000` (It has to be HTTPS).
+4. `npm run serve` to run a test web server locally. Default URL is `https://localhost:9000` (It has to be HTTPS). You might have to change the `src` path of `<script>` at the bottom of `docs/index.html` to test it correctly (I'm finding a way to automate this.)
 
-5. `make clean` to clean up build files.
+5. `npm run clean` to clean up build files.

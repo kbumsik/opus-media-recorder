@@ -25,23 +25,24 @@ OUTPUT_FILES += OpusMediaRecorder.umd.js encoderWorker.umd.js
 
 FINAL_TARGETS_BUILD = $(addprefix $(BUILD_DIR)/,$(OUTPUT_FILES))
 
-ifdef PRODUCTION
-	# Production only section
-	# .bin files - Some bundlers needs extension other than .wasm
-	OUTPUT_FILES_WASM := $(filter %.wasm, $(OUTPUT_FILES))
-	OUTPUT_FILES_BIN = $(OUTPUT_FILES_WASM:%.wasm=%.bin)
-	# Production only files: dist
-	FINAL_TARGETS_DIST = $(addprefix $(DIST_DIR)/,$(OUTPUT_FILES) $(OUTPUT_FILES_BIN))
-else
+# Production only section
+# .bin files - Some bundlers needs extension other than .wasm
+OUTPUT_FILES_WASM := $(filter %.wasm, $(OUTPUT_FILES))
+OUTPUT_FILES_BIN = $(OUTPUT_FILES_WASM:%.wasm=%.bin)
+# Production only files: dist
+FINAL_TARGETS_DIST = $(addprefix $(DIST_DIR)/,$(OUTPUT_FILES) $(OUTPUT_FILES_BIN))
+
+ifndef PRODUCTION
 	# Development only section
 	# Debugging map files
 	OUTPUT_FILES += OggOpusEncoder.wasm.map WebMOpusEncoder.wasm.map
 endif
 
-
-# This is the final targets, what "make" command builds
-all : check_emcc $(FINAL_TARGETS_BUILD) $(FINAL_TARGETS_DIST)
-
+ifdef PRODUCTION
+all: check_emcc $(FINAL_TARGETS_BUILD) $(FINAL_TARGETS_DIST)
+else
+all: check_emcc $(FINAL_TARGETS_BUILD)
+endif
 
 ################################################################################
 # 1. Emscripten compilation
@@ -230,15 +231,20 @@ check_emcc:
 $(BUILD_DIR) $(LIB_BUILD_DIR):
 	mkdir -p $@
 
-run: all
-	npm start -- --port $(DEV_SERVER_PORT)
+serve: all
+	# Run server
+	npm run serve -- --port $(DEV_SERVER_PORT)
 
 clean-lib:
+	# Clean /lib
 	make -C $(LIB_DIR) clean
 
 clean-js:
-	-rm -rf $(BUILD_DIR) WebIDLGrammar.pkl parser.out
-	# Revert tracked dist files
-	git clean -df $(FINAL_TARGETS_DIST)
+	# Delete build files
+	-rm -rf $(BUILD_DIR)
+	# Delete WebIDL parser outputs
+	-rm WebIDLGrammar.pkl parser.out
+	# Delete Dist files
+	-rm $(FINAL_TARGETS_DIST)
 
 clean: clean-lib clean-js
