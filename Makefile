@@ -240,11 +240,13 @@ clean-lib:
 	make -C $(LIB_DIR) clean
 
 clean-js:
-	# Delete build files
-	-rm -rf $(BUILD_DIR)
+	# Delete build files, not touch subdirectory like LIB_BUILD_DIR
+	-rm $(BUILD_DIR)/*
 	# Delete WebIDL parser outputs
 	-rm WebIDLGrammar.pkl parser.out
 	# Delete Dist files
 	-rm $(FINAL_TARGETS_DIST)
 
 clean: clean-lib clean-js
+	# Delete build folder
+	-rm -rf $(BUILD_DIR)

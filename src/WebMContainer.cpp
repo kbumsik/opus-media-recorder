@@ -1,25 +1,8 @@
 #include "WebMContainer.hpp"
-#include <string>
-#include <cstring>
 #include "emscriptenImport.hpp"
 
-// See OggContainer::produceIDPage for more detail
-enum {
-  ID_OPUS_MAGIC_OFFSET = 0,
-  ID_OPUS_VER_OFFSET = 8,
-  ID_OPUS_CH_OFFSET = 9,
-  ID_OPUS_PRE_SKIP_OFFSET = 10,
-  ID_OPUS_SAMPLE_RATE_OFFSET = 12,
-  ID_OPUS_GAIN_OFFSET = 16,
-  ID_OPUS_MAPPING_FAMILY_OFFSET = 18
-};
-#define ID_OPUS_SIZE (ID_OPUS_MAPPING_FAMILY_OFFSET + 1)
-
-
-WebMContainer::WebMContainer(uint32_t sample_rate, uint8_t channel_count, int serial)
-  : sample_rate_(sample_rate),
-    channel_count_(channel_count),
-    safe_to_copy_(false),
+WebMContainer::WebMContainer()
+  : ContainerInterface(),
     position_(0),
     force_one_libwebm_error_(false),
     first_frame_timestamp_audio_(0),
@@ -34,15 +17,37 @@ WebMContainer::WebMContainer(uint32_t sample_rate, uint8_t channel_count, int se
   mkvmuxer::SegmentInfo* const info = segment_.GetSegmentInfo();
   info->set_writing_app("opus-media-recorder");
   info->set_muxing_app("opus-media-recorder");
+}
+
+WebMContainer::~WebMContainer()
+{
+  segment_.Finalize();
+}
+
+void WebMContainer::init(uint32_t sample_rate, uint8_t channel_count, int serial)
+{
+  ContainerInterface::init(sample_rate, channel_count, serial);
 
   // Add a track.
   // TODO: support for multiple tracks
   addTrack();
 }
 
-WebMContainer::~WebMContainer()
+void WebMContainer::writeFrame(void *data, std::size_t size, int num_samples)
 {
-  segment_.Finalize();
+  // TODO: calculate paused time???
+  uint64_t timestamp = ((uint64_t)(num_samples * 1000000ull)) / (uint64_t)sample_rate_;
+  // uint64_t timestamp = 20 * 1000;
+
+  if (force_one_libwebm_error_) {
+    force_one_libwebm_error_ = false;
+    throw "WebM: Forcing error";
+  }
+
+  segment_.AddFrame(reinterpret_cast<const uint8_t*>(data),
+                    size, track_number_, most_recent_timestamp_ * 1000,
+                    true); /* is_key: -- always true for audio */
+  most_recent_timestamp_ += timestamp;
 }
 
 mkvmuxer::int32 WebMContainer::Write(const void* buf, mkvmuxer::uint32 len) {
@@ -102,45 +107,4 @@ void WebMContainer::addTrack(void)
   if (1000000ull != segment_.GetSegmentInfo()->timecode_scale()) {
     throw "WebM: Timecode resolution error";
   }
-}
-
-void WebMContainer::writeOpusHeader(uint8_t *header)
-{
-  // Reference: https://wiki.xiph.org/MatroskaOpus
-  // Magic Signature 'OpusHead'
-  const static std::string magic = "OpusHead";
-  std::memcpy(header + ID_OPUS_MAGIC_OFFSET, magic.c_str(), magic.size());
-  // The version must always be 1 (8 bits, unsigned).
-  header[ID_OPUS_VER_OFFSET] = 1;
-  // Number of output channels (8 bits, unsigned).
-  header[ID_OPUS_CH_OFFSET] = channel_count_;
-  // Firefox seems to have problem with non-zero pre-skip.
-  // Related topic: https://wiki.xiph.org/MatroskaOpus#Proposal_2:_Use_pre-skip_data_from_CodecPrivate
-  const uint16_t pre_skip = 0;
-  std::memcpy(header + ID_OPUS_PRE_SKIP_OFFSET, &pre_skip, sizeof(uint16_t));
-  // The sampling rate of input source (32 bits, unsigned, little endian).
-  std::memcpy(header + ID_OPUS_SAMPLE_RATE_OFFSET, &sample_rate_, sizeof(uint32_t));
-  // Output gain, an encoder should set this field to zero (16 bits, signed,
-  // little endian).
-  const uint16_t gain = 0;
-  std::memcpy(header + ID_OPUS_GAIN_OFFSET, &gain, sizeof(uint16_t));
-  // Channel Mapping Family 0: mono or stereo (left, right). (8 bits, unsigned).
-  header[ID_OPUS_MAPPING_FAMILY_OFFSET] = 0;
-}
-
-void WebMContainer::writeFrame(void *data, std::size_t size, int num_samples)
-{
-  // TODO: calculate paused time???
-  uint64_t timestamp = ((uint64_t)(num_samples * 1000000ull)) / (uint64_t)sample_rate_;
-  // uint64_t timestamp = 20 * 1000;
-
-  if (force_one_libwebm_error_) {
-    force_one_libwebm_error_ = false;
-    throw "WebM: Forcing error";
-  }
-
-  segment_.AddFrame(reinterpret_cast<const uint8_t*>(data),
-                    size, track_number_, most_recent_timestamp_ * 1000,
-                    true); /* is_key: -- always true for audio */
-  most_recent_timestamp_ += timestamp;
 }

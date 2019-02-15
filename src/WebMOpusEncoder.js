@@ -50,8 +50,9 @@ class _WebMOpusEncoder {
     this._speex_resampler_process_interleaved_float = Module._speex_resampler_process_interleaved_float;
     this._speex_resampler_destroy = Module._speex_resampler_destroy;
     // Ogg container imported using WebIDL binding
-    this._contrainer = new Module.WebMContainer(OPUS_OUTPUT_SAMPLE_RATE, channelCount,
-                                                Math.floor(Math.random() * 0xFFFFFFFF));
+    this._contrainer = new Module.WebMContainer();
+    this._contrainer.init(OPUS_OUTPUT_SAMPLE_RATE, channelCount,
+                          Math.floor(Math.random() * 0xFFFFFFFF));
 
     this.OpusInitCodec(OPUS_OUTPUT_SAMPLE_RATE, channelCount, bitsPerSecond);
     this.SpeexInitResampler(inputSampleRate, OPUS_OUTPUT_SAMPLE_RATE, channelCount);
