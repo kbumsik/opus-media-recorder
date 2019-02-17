@@ -5,7 +5,7 @@
 #include <cstring>
 #include <string>
 
-// See OggContainer::produceIDPage for more detail
+// See ContainerInterface::writeOpusIdHeader for more detail
 enum {
   ID_OPUS_MAGIC_OFFSET = 0,
   ID_OPUS_VER_OFFSET = 8,
@@ -13,9 +13,22 @@ enum {
   ID_OPUS_PRE_SKIP_OFFSET = 10,
   ID_OPUS_SAMPLE_RATE_OFFSET = 12,
   ID_OPUS_GAIN_OFFSET = 16,
-  ID_OPUS_MAPPING_FAMILY_OFFSET = 18
+  ID_OPUS_MAPPING_FAMILY_OFFSET = 18,
+  ID_OPUS_SIZE = ID_OPUS_MAPPING_FAMILY_OFFSET + 1
 };
-#define ID_OPUS_SIZE (ID_OPUS_MAPPING_FAMILY_OFFSET + 1)
+
+// See ContainerInterface::writeOpusCommentHeader for more detail
+enum {
+  COMMENT_OPUS_MAGIC_OFFSET = 0,
+  COMMENT_OPUS_VENDOR_LEN_OFFSET = 8,
+  COMMENT_OPUS_VENDOR_STR_OFFSET = 12,
+  // COMMENT_OPUS_VENDOR_STR_OFFSET + 'opus-media-recorder'
+  COMMENT_OPUS_COMMENT_LIST_LEN_OFFSET = COMMENT_OPUS_VENDOR_STR_OFFSET + 19,
+  COMMENT_OPUS_COMMENT_0_LEN_OFFSET = COMMENT_OPUS_COMMENT_LIST_LEN_OFFSET +4,
+  COMMENT_OPUS_COMMENT_0_STR_OFFSET = COMMENT_OPUS_COMMENT_0_LEN_OFFSET +4,
+  // COMMENT_OPUS_COMMENT_0_STR_OFFSET + 'TITLE=recording'
+  COMMENT_OPUS_SIZE = COMMENT_OPUS_COMMENT_0_STR_OFFSET + 15
+};
 
 class ContainerInterface
 {
@@ -46,9 +59,9 @@ public:
 protected:
   uint32_t sample_rate_;
   uint8_t channel_count_;
-  bool safe_to_copy_;
 
-  void writeOpusHeader(uint8_t *header);
+  void writeOpusIdHeader(uint8_t *header);
+  void writeOpusCommentHeader(uint8_t *header);
 };
 
 #endif /* CONTAINERINTERFACE_H_ */

@@ -62,6 +62,7 @@ self.onmessage = function (e) {
     case 'done':
       if (command === 'done') {
         encoder.encodeFinalFrame();
+        encoder.close();
       }
 
       const buffers = encoder.flush();
@@ -71,8 +72,6 @@ self.onmessage = function (e) {
       }, buffers);
 
       if (command === 'done') {
-        // Close
-        encoder.close();
         self.close();
       }
       break;

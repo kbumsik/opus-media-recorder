@@ -24,19 +24,12 @@ const OPUS_SET_BITRATE_REQUEST = 4002;
 // in speex_resampler.h
 const RESAMPLER_ERR_SUCCESS = 0;
 
-/**
- * Emscripten (wasm) Module. Module is globally defined after compiling with emcc.
- * String indexing is used to prevent transpilers (e.g. babel) from changing name.
- */
-/* global Module */
-
 class _WebMOpusEncoder {
   constructor (inputSampleRate, channelCount, bitsPerSecond = undefined) {
     this.config = {
       inputSampleRate, // Usually 44100Hz or 48000Hz
       channelCount
     };
-    this.encodedBuffers = [];
 
     // Emscripten memory allocator
     this.memory = new EmscriptenMemoryAllocator(Module);
@@ -50,9 +43,9 @@ class _WebMOpusEncoder {
     this._speex_resampler_process_interleaved_float = Module._speex_resampler_process_interleaved_float;
     this._speex_resampler_destroy = Module._speex_resampler_destroy;
     // Ogg container imported using WebIDL binding
-    this._contrainer = new Module.WebMContainer();
-    this._contrainer.init(OPUS_OUTPUT_SAMPLE_RATE, channelCount,
-                          Math.floor(Math.random() * 0xFFFFFFFF));
+    this._container = new Module.WebMContainer();
+    this._container.init(OPUS_OUTPUT_SAMPLE_RATE, channelCount,
+                         Math.floor(Math.random() * 0xFFFFFFFF));
 
     this.OpusInitCodec(OPUS_OUTPUT_SAMPLE_RATE, channelCount, bitsPerSecond);
     this.SpeexInitResampler(inputSampleRate, OPUS_OUTPUT_SAMPLE_RATE, channelCount);
@@ -73,7 +66,7 @@ class _WebMOpusEncoder {
                             : undefined;
   }
 
-  encode (buffers, final = false) {
+  encode (buffers) {
     let samples = this.interleave(buffers);
     let sampleIndex = 0;
 
@@ -111,15 +104,12 @@ class _WebMOpusEncoder {
           throw new Error('Opus encoding error.');
         }
         // Input packget to WebM page generator
-        this._contrainer.writeFrame(this.mOutputBuffer.pointer,
-                                    packetLength,
-                                    this.outputSamplePerChannel); // 960 samples
+        this._container.writeFrame(this.mOutputBuffer.pointer,
+                                   packetLength,
+                                   this.outputSamplePerChannel); // 960 samples
         this.inputBufferIndex = 0;
       }
       sampleIndex += lengthToCopy;
-    }
-    if (final) {
-      // Just to flag this is the end of the stream
     }
   }
 
@@ -127,7 +117,7 @@ class _WebMOpusEncoder {
    * Free up memory before close the web worker.
    */
   close () {
-    Module.destroy(this._contrainer);
+    Module.destroy(this._container);
     this.mInputBuffer.free();
     this.mResampledBuffer.free();
     this.mOutputBuffer.free();
@@ -203,6 +193,7 @@ class _WebMOpusEncoder {
  * the encoder via those functions only.
  */
 Module.init = function (inputSampleRate, channelCount, bitsPerSecond) {
+  Module.encodedBuffers = [];
   Module.encoder = new _WebMOpusEncoder(inputSampleRate, channelCount, bitsPerSecond);
 };
 
@@ -215,7 +206,7 @@ Module.encodeFinalFrame = function () {
 };
 
 Module.flush = function () {
-  return Module.encoder.encodedBuffers.splice(0, Module.encoder.encodedBuffers.length);
+  return Module.encodedBuffers.splice(0, Module.encodedBuffers.length);
 };
 
 Module.close = function () {

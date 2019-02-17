@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstddef>
 #include "lib/ogg/include/ogg/ogg.h"
+#include "ContainerInterface.hpp"
 
 /**
  * @brief Ogg Container class
@@ -52,6 +53,7 @@
  *      4. If producePacketPage() return non-zero value, iterate from step 1.
  */
 class OggContainer
+  : protected ContainerInterface
 {
 public:
   /**
@@ -61,22 +63,18 @@ public:
    * @param channel_count   The number of channels of the stream the maxium is 2.
    * @param serial          Uniqute number of the stream. Usually a random number.
    */
-  OggContainer(uint32_t sample_rate, uint8_t channel_count, int serial);
+  OggContainer();
   ~OggContainer();
 
-  void writeStream(void *data, std::size_t size, int num_samples, bool e_o_s = false);
+  void init(uint32_t sample_rate, uint8_t channel_count, int serial) override;
 
-  void produceIDPage(void);
-  void produceCommentPage(void);
-  int producePacketPage(bool force = false);
+  void writeFrame(void *data, std::size_t size, int num_samples) override;
 
-  bool safeToCopy(void);
-  void* getOggHeader(void);
-  long getOggHeaderSize(void);
-
-  void* getOggBody(void);
-  long getOggBodySize(void);
 private:
+  ogg_stream_state stream_state_;
+  ogg_page page_;
+  ogg_packet packet_;
+
   /**
    * @brief   Insert data (or a packet). The inserted data can be later collected
    *          as Ogg pages by calling producePacketPage().
@@ -88,12 +86,9 @@ private:
    */
   void writePacket(uint8_t *data, std::size_t size, int num_samples, bool e_o_s = false);
 
-  uint32_t sample_rate_;
-  uint8_t channel_count_;
-  bool safe_to_copy_;
-  ogg_stream_state stream_state_;
-  ogg_page page_;
-  ogg_packet packet_;
+  void produceIDPage(void);
+  void produceCommentPage(void);
+  int producePacketPage(bool force = false);
 };
 
 #endif /* OGGCONTAINER_H_ */

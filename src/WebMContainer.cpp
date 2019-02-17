@@ -96,7 +96,7 @@ void WebMContainer::addTrack(void)
   audio_track->set_codec_id(mkvmuxer::Tracks::kOpusCodecId);
 
   uint8_t opus_header[ID_OPUS_SIZE];
-  writeOpusHeader(opus_header);
+  writeOpusIdHeader(opus_header);
 
   if (!audio_track->SetCodecPrivate(opus_header, ID_OPUS_SIZE)) {
     throw "WebM: failed to set opus header";

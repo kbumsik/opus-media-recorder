@@ -30,7 +30,6 @@ class _OggOpusEncoder {
       inputSampleRate, // Usually 44100Hz or 48000Hz
       channelCount
     };
-    this.encodedBuffers = [];
 
     // Emscripten memory allocator
     this.memory = new EmscriptenMemoryAllocator(Module);
@@ -44,8 +43,9 @@ class _OggOpusEncoder {
     this._speex_resampler_process_interleaved_float = Module._speex_resampler_process_interleaved_float;
     this._speex_resampler_destroy = Module._speex_resampler_destroy;
     // Ogg container imported using WebIDL binding
-    this._contrainer = new Module.OggContainer(OPUS_OUTPUT_SAMPLE_RATE, channelCount,
-                                               Math.floor(Math.random() * 0xFFFFFFFF));
+    this._container = new Module.OggContainer();
+    this._container.init(OPUS_OUTPUT_SAMPLE_RATE, channelCount,
+                         Math.floor(Math.random() * 0xFFFFFFFF));
 
     this.OpusInitCodec(OPUS_OUTPUT_SAMPLE_RATE, channelCount, bitsPerSecond);
     this.SpeexInitResampler(inputSampleRate, OPUS_OUTPUT_SAMPLE_RATE, channelCount);
@@ -60,17 +60,13 @@ class _OggOpusEncoder {
     this.mResampledBuffer = this.memory.mallocFloat32Buffer(this.outputSamplePerChannel * channelCount);
     this.mOutputBuffer = this.memory.mallocUint8Buffer(OPUS_OUTPUT_MAX_LENGTH);
 
-    // Create Ogg metadata
-    this.OggGenerateIdPage();
-    this.OggGenerateCommentPage();
-
     // TODO: Figure out how to delete this thing.
     this.interleavedBuffers = (channelCount !== 1)
                             ? new Float32Array(BUFFER_LENGTH * channelCount)
                             : undefined;
   }
 
-  encode (buffers, final = false) {
+  encode (buffers) {
     let samples = this.interleave(buffers);
     let sampleIndex = 0;
 
@@ -108,51 +104,30 @@ class _OggOpusEncoder {
           throw new Error('Opus encoding error.');
         }
         // Input packget to Ogg page generator
-        this._contrainer.writeStream(this.mOutputBuffer.pointer,
-                                     packetLength,
-                                     this.outputSamplePerChannel, // 960 samples
-                                     false);
+        this._container.writeFrame(this.mOutputBuffer.pointer,
+                                   packetLength,
+                                   this.outputSamplePerChannel); // 960 samples
         this.inputBufferIndex = 0;
       }
       sampleIndex += lengthToCopy;
     }
-    if (final) {
-      // Just to flag this is the end of the stream
-      this._contrainer.writeStream(this.mOutputBuffer.pointer,
-                                   0, // No bytes
-                                   0, // No samples
-                                   true);
-    }
-
-    // Generate Ogg pages
-    let morePage = 1;
-    while (morePage > 0) {
-      morePage = this._contrainer.producePacketPage(false);
-      this.OggPushPage();
-    }
-    // If this is the last call, then flush remaining packets into an Ogg page
-    if (final) {
-      this._contrainer.producePacketPage(true);
-      this.OggPushPage();
-    }
-  }
-
-  encodeFinalFrame () {
-    const {channelCount} = this.config;
-
-    // Fill zero to buffers, size is the same as re rest of inputBuffer.
-    let finalFrameBuffers = [];
-    for (let i = 0; i < channelCount; ++i) {
-      finalFrameBuffers.push(new Float32Array(BUFFER_LENGTH - (this.inputBufferIndex / channelCount)));
-    }
-    this.encode(finalFrameBuffers, true);
   }
 
   /**
    * Free up memory before close the web worker.
    */
   close () {
-    Module.destroy(this._contrainer);
+    // Encode the remaining buffers first.
+    const {channelCount} = this.config;
+    // Fill zero to buffers, size is the same as re rest of inputBuffer.
+    let finalFrameBuffers = [];
+    for (let i = 0; i < channelCount; ++i) {
+      finalFrameBuffers.push(new Float32Array(BUFFER_LENGTH - (this.inputBufferIndex / channelCount)));
+    }
+    this.encode(finalFrameBuffers);
+
+    // By destroying the container it may emit the remaining buffer.
+    Module.destroy(this._container);
     this.mInputBuffer.free();
     this.mResampledBuffer.free();
     this.mOutputBuffer.free();
@@ -218,34 +193,6 @@ class _OggOpusEncoder {
       throw new Error('Initializing resampler failed.');
     }
   }
-
-  OggGenerateIdPage () {
-    this._contrainer.produceIDPage();
-    this.OggPushPage();
-  }
-
-  OggGenerateCommentPage () {
-    this._contrainer.produceCommentPage();
-    this.OggPushPage();
-  }
-
-  OggPushPage () {
-    if (!this._contrainer.safeToCopy()) {
-      return false;
-    }
-    // Get header buffer
-    let header = new Uint8Array(Module.HEAPU8.buffer,
-                                this._contrainer.getOggHeader(),
-                                this._contrainer.getOggHeaderSize());
-    // Get body buffer
-    let body = new Uint8Array(Module.HEAPU8.buffer,
-                              this._contrainer.getOggBody(),
-                              this._contrainer.getOggBodySize());
-    // Copy buffer and push
-    this.encodedBuffers.push(new Uint8Array(header).buffer);
-    this.encodedBuffers.push(new Uint8Array(body).buffer);
-    return true;
-  }
 }
 
 // Emscripten (wasm) Module. Module is globally defined after compiled by emcc.
@@ -256,6 +203,7 @@ class _OggOpusEncoder {
  * the encoder via those functions only.
  */
 Module.init = function (inputSampleRate, channelCount, bitsPerSecond) {
+  Module.encodedBuffers = [];
   Module.encoder = new _OggOpusEncoder(inputSampleRate, channelCount, bitsPerSecond);
 };
 
@@ -264,11 +212,10 @@ Module.encode = function (buffers) {
 };
 
 Module.encodeFinalFrame = function () {
-  Module.encoder.encodeFinalFrame();
 };
 
 Module.flush = function () {
-  return Module.encoder.encodedBuffers.splice(0, Module.encoder.encodedBuffers.length);
+  return Module.encodedBuffers.splice(0, Module.encodedBuffers.length);
 };
 
 Module.close = function () {
