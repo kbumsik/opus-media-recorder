@@ -50,18 +50,20 @@ endif
 # Reference: https://github.com/kripken/emscripten/blob/master/src/settings.js
 
 # Emscripten compiler (emcc) options
-EMCC_OPTS = -g4 \
+EMCC_OPTS = -std=c++11 \
+			-g4 \
 			-O1 \
 			--llvm-lto 1 \
 			-s WASM=1 \
+			-s MODULARIZE=1 \
 			-s DETERMINISTIC=1 \
 			-s FILESYSTEM=0 \
 			-s NO_DYNAMIC_EXECUTION=1 \
-			-s ENVIRONMENT='worker' \
 			-s MALLOC="emmalloc" \
 			-s DISABLE_EXCEPTION_CATCHING=0 \
-			--source-map-base http://localhost:$(DEV_SERVER_PORT)/ \
-			-s MODULARIZE=1
+			--source-map-base http://localhost:$(DEV_SERVER_PORT)/
+			# -s EXPORT_ES6=1
+			# -s ENVIRONMENT='worker'
 			# -s "BINARYEN_METHOD='native-wasm'" \
 			# --closure 1
 
@@ -77,19 +79,7 @@ SPEEX_EXPORTS:='_speex_resampler_init', \
 # WebIDL
 WEBIDL = Container.webidl
 WEBIDL_GLUE_BASE = $(addsuffix _glue,$(addprefix $(LIB_BUILD_DIR)/,$(WEBIDL)))
-
-# OggOpus targets
 WEBIDL_GLUE_JS = $(addsuffix .js,$(WEBIDL_GLUE_BASE))
-OGG_OPUS_SRC = $(SRC_DIR)/OggContainer.cpp \
-				$(SRC_DIR)/OggContainer_webidl_js_binder.cpp \
-				$(SRC_DIR)/ContainerInterface.cpp
-OGG_OPUS_INCLUDE = $(SRC_DIR)/OggContainer.hpp
-
-# WebMOpus targets
-WEBM_OPUS_SRC = $(SRC_DIR)/WebMContainer.cpp \
-				$(SRC_DIR)/WebMContainer_webidl_js_binder.cpp \
-				$(SRC_DIR)/ContainerInterface.cpp
-WEBM_OPUS_INCLUDE = $(SRC_DIR)/WebMContainer.hpp
 
 # OGG/WebM Common
 EMCC_INCLUDE_DIR = $(SRC_DIR) \
@@ -109,21 +99,14 @@ export OPUS_OBJ = $(LIB_BUILD_DIR)/libopus.a
 export OGG_OBJ = $(LIB_BUILD_DIR)/libogg.a
 export SPEEX_OBJ = $(LIB_BUILD_DIR)/libspeexdsp.a
 export WEBM_OBJ = $(LIB_BUILD_DIR)/libwebm.a
-OBJS = $(OPUS_OBJ) $(OGG_OBJ) $(SPEEX_OBJ) $(WEBM_OBJ)
-
-# emcc targets
-EMCC_OGG_OPUS_JS = $(BUILD_DIR)/OggOpusEncoder.js
-EMCC_WEBM_OPUS_JS = $(BUILD_DIR)/WebMOpusEncoder.js
-
-# emcc target source files
-SRC_OPUS_ENCODER_JS = $(SRC_DIR)/OpusEncoder.js
+LIB_OBJS = $(OPUS_OBJ) $(OGG_OBJ) $(SPEEX_OBJ) $(WEBM_OBJ)
 
 ###########
 # Targets #
 ###########
 
 # 1.1 Static library targets
-$(OBJS):
+$(LIB_OBJS):
 	make -C $(LIB_DIR) $@
 
 # 1.2 C++ - WebIDL - JavaScript glue code targets
@@ -132,27 +115,19 @@ $(WEBIDL_GLUE_JS): $(addprefix $(SRC_DIR)/,$(WEBIDL)) $(LIB_BUILD_DIR)
 		$< \
 		$(WEBIDL_GLUE_BASE)
 
-# 1.3 Compile using emcc
-$(EMCC_OGG_OPUS_JS) $(EMCC_OGG_OPUS_JS:%.js=%.wasm) $(EMCC_OGG_OPUS_JS:%.js=%.wasm.map): $(SRC_OPUS_ENCODER_JS) $(WEBIDL_GLUE_JS) $(OGG_OPUS_SRC) $(OGG_OPUS_INCLUDE) $(OBJS)
-	emcc -o $(EMCC_OGG_OPUS_JS) \
+# $(BUILD_DIR)/OggOpusEncoder.js
+# $(BUILD_DIR)/WebMOpusEncoder.js
+$(BUILD_DIR)/%OpusEncoder.js $(BUILD_DIR)/%OpusEncoder.wasm $(BUILD_DIR)/%OpusEncoder.wasm.map: $(SRC_DIR)/%Container.cpp $(SRC_DIR)/%Container_webidl_js_binder.cpp $(SRC_DIR)/%Container.hpp $(SRC_DIR)/OpusEncoder.js $(WEBIDL_GLUE_JS) $(SRC_DIR)/ContainerInterface.cpp $(LIB_OBJS)
+	emcc -o $@ \
 		$(EMCC_OPTS) \
 		-s EXPORTED_FUNCTIONS="[$(DEFAULT_EXPORTS),$(OPUS_EXPORTS),$(SPEEX_EXPORTS)]" \
 		$(addprefix -I,$(EMCC_INCLUDE_DIR)) \
-		$(OGG_OPUS_SRC) \
-		$(OBJS) \
-		--pre-js $< \
-		--post-js $(word 2,$^)
-
-$(EMCC_WEBM_OPUS_JS) $(EMCC_WEBM_OPUS_JS:%.js=%.wasm) $(EMCC_WEBM_OPUS_JS:%.js=%.wasm.map): $(SRC_OPUS_ENCODER_JS) $(WEBIDL_GLUE_JS) $(WEBM_OPUS_SRC) $(WEBM_OPUS_INCLUDE) $(OBJS)
-	emcc -o $(EMCC_WEBM_OPUS_JS) \
-		$(EMCC_OPTS) \
-		-s EXPORTED_FUNCTIONS="[$(DEFAULT_EXPORTS),$(OPUS_EXPORTS),$(SPEEX_EXPORTS)]" \
-		$(addprefix -I,$(EMCC_INCLUDE_DIR)) \
-		$(WEBM_OPUS_SRC) \
-		$(OBJS) \
-		--pre-js $< \
-		--post-js $(word 2,$^)
-
+		$(word 1,$^) \
+		$(word 2,$^) \
+		$(SRC_DIR)/ContainerInterface.cpp \
+		$(LIB_OBJS) \
+		--pre-js $(SRC_DIR)/OpusEncoder.js \
+		--post-js $(WEBIDL_GLUE_JS)
 
 ################################################################################
 # 2. UMD compilation using webpack
