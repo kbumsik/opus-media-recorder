@@ -211,10 +211,6 @@ Module.encode = function (buffers) {
   Module.encoder.encode(buffers);
 };
 
-Module.encodeFinalFrame = function () {
-  // Nothing to do
-};
-
 Module.flush = function () {
   return Module.encodedBuffers.splice(0, Module.encodedBuffers.length);
 };

@@ -108,10 +108,6 @@ function emscriptenModuleEmulator (Module) {
       Module.encoder.encode(buffers);
     };
 
-    Module.encodeFinalFrame = function () {
-      // Nothing to do.
-    };
-
     Module.flush = function () {
       let header = Module.encoder.getHeader();
       let body = Module.encoder.encodedBuffers.splice(0, Module.encoder.encodedBuffers.length);

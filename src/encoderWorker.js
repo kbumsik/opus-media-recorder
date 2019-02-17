@@ -61,7 +61,6 @@ self.onmessage = function (e) {
     case 'getEncodedData':
     case 'done':
       if (command === 'done') {
-        encoder.encodeFinalFrame();
         encoder.close();
       }
 
