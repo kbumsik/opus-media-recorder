@@ -6,7 +6,7 @@
 #include "lib/webm/mkvmuxer.hpp"
 #include "ContainerInterface.hpp"
 
-class WebMContainer
+class Container
   : protected ContainerInterface,
     public mkvmuxer::IMkvWriter
 {
@@ -18,8 +18,8 @@ class WebMContainer
      * @param channel_count   The number of channels of the stream the maxium is 2.
      * @param serial          Uniqute number of the stream. Usually a random number.
      */
-    WebMContainer();
-    ~WebMContainer();
+    Container();
+    ~Container();
 
     void init(uint32_t sample_rate, uint8_t channel_count, int serial) override;
 

@@ -1,7 +1,7 @@
 #include "WebMContainer.hpp"
 #include "emscriptenImport.hpp"
 
-WebMContainer::WebMContainer()
+Container::Container()
   : ContainerInterface(),
     position_(0),
     force_one_libwebm_error_(false),
@@ -19,12 +19,12 @@ WebMContainer::WebMContainer()
   info->set_muxing_app("opus-media-recorder");
 }
 
-WebMContainer::~WebMContainer()
+Container::~Container()
 {
   segment_.Finalize();
 }
 
-void WebMContainer::init(uint32_t sample_rate, uint8_t channel_count, int serial)
+void Container::init(uint32_t sample_rate, uint8_t channel_count, int serial)
 {
   ContainerInterface::init(sample_rate, channel_count, serial);
 
@@ -33,7 +33,7 @@ void WebMContainer::init(uint32_t sample_rate, uint8_t channel_count, int serial
   addTrack();
 }
 
-void WebMContainer::writeFrame(void *data, std::size_t size, int num_samples)
+void Container::writeFrame(void *data, std::size_t size, int num_samples)
 {
   // TODO: calculate paused time???
   uint64_t timestamp = ((uint64_t)(num_samples * 1000000ull)) / (uint64_t)sample_rate_;
@@ -50,36 +50,36 @@ void WebMContainer::writeFrame(void *data, std::size_t size, int num_samples)
   most_recent_timestamp_ += timestamp;
 }
 
-mkvmuxer::int32 WebMContainer::Write(const void* buf, mkvmuxer::uint32 len) {
+mkvmuxer::int32 Container::Write(const void* buf, mkvmuxer::uint32 len) {
   emscriptenPushBuffer(buf, len);
   position_ += len;
   return 0;
 }
 
-mkvmuxer::int64 WebMContainer::Position() const
+mkvmuxer::int64 Container::Position() const
 {
   return position_;
 }
 
-mkvmuxer::int32 WebMContainer::Position(mkvmuxer::int64 position)
+mkvmuxer::int32 Container::Position(mkvmuxer::int64 position)
 {
   // Is not Seekable() so it always returns fail
   return -1;
 }
 
-bool WebMContainer::Seekable() const
+bool Container::Seekable() const
 {
   return false;
 }
 
-void WebMContainer::ElementStartNotify(mkvmuxer::uint64 element_id,
+void Container::ElementStartNotify(mkvmuxer::uint64 element_id,
                                    mkvmuxer::int64 position)
 {
   // TODO: Not used in this project, not sure if I should something here.
   return;
 }
 
-void WebMContainer::addTrack(void)
+void Container::addTrack(void)
 {
   track_number_ = segment_.AddAudioTrack(sample_rate_, channel_count_, 0);
   if (track_number_ <= 0) {

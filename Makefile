@@ -74,22 +74,22 @@ SPEEX_EXPORTS:='_speex_resampler_init', \
 				'_speex_resampler_process_interleaved_float', \
 				'_speex_resampler_destroy'
 
+# WebIDL
+WEBIDL = Container.webidl
+WEBIDL_GLUE_BASE = $(addsuffix _glue,$(addprefix $(LIB_BUILD_DIR)/,$(WEBIDL)))
+
 # OggOpus targets
-OGG_WEBIDL = OggContainer.webidl
-OGG_WEBIDL_GLUE_BASE = $(addsuffix _glue,$(addprefix $(LIB_BUILD_DIR)/,$(OGG_WEBIDL)))
-# build/emscripten/%.webidl_glue.js
-OGG_WEBIDL_GLUE_JS = $(addsuffix .js,$(OGG_WEBIDL_GLUE_BASE))
+WEBIDL_GLUE_JS = $(addsuffix .js,$(WEBIDL_GLUE_BASE))
 OGG_OPUS_SRC = $(SRC_DIR)/OggContainer.cpp \
-				$(SRC_DIR)/oggcontainer_webidl_js_binder.cpp
+				$(SRC_DIR)/OggContainer_webidl_js_binder.cpp \
+				$(SRC_DIR)/ContainerInterface.cpp
 OGG_OPUS_INCLUDE = $(SRC_DIR)/OggContainer.hpp
 
 # WebMOpus targets
-WEBM_WEBIDL = WebMContainer.webidl
-WEBM_WEBIDL_GLUE_BASE = $(addsuffix _glue,$(addprefix $(LIB_BUILD_DIR)/,$(WEBM_WEBIDL)))
-WEBM_WEBIDL_GLUE_JS = $(addsuffix .js,$(WEBM_WEBIDL_GLUE_BASE))
 WEBM_OPUS_SRC = $(SRC_DIR)/WebMContainer.cpp \
-				$(SRC_DIR)/webmcontainer_webidl_js_binder.cpp
-WEBM_INCLUDE = $(SRC_DIR)/WebMContainer.hpp
+				$(SRC_DIR)/WebMContainer_webidl_js_binder.cpp \
+				$(SRC_DIR)/ContainerInterface.cpp
+WEBM_OPUS_INCLUDE = $(SRC_DIR)/WebMContainer.hpp
 
 # OGG/WebM Common
 EMCC_INCLUDE_DIR = $(SRC_DIR) \
@@ -116,8 +116,7 @@ EMCC_OGG_OPUS_JS = $(BUILD_DIR)/OggOpusEncoder.js
 EMCC_WEBM_OPUS_JS = $(BUILD_DIR)/WebMOpusEncoder.js
 
 # emcc target source files
-SRC_OGG_OPUS_JS = $(SRC_DIR)/OggOpusEncoder.js
-SRC_WEBM_OPUS_JS = $(SRC_DIR)/WebMOpusEncoder.js
+SRC_OPUS_ENCODER_JS = $(SRC_DIR)/OpusEncoder.js
 
 ###########
 # Targets #
@@ -128,18 +127,13 @@ $(OBJS):
 	make -C $(LIB_DIR) $@
 
 # 1.2 C++ - WebIDL - JavaScript glue code targets
-$(OGG_WEBIDL_GLUE_JS): $(addprefix $(SRC_DIR)/,$(OGG_WEBIDL)) $(LIB_BUILD_DIR)
+$(WEBIDL_GLUE_JS): $(addprefix $(SRC_DIR)/,$(WEBIDL)) $(LIB_BUILD_DIR)
 	python $(EMSCRIPTEN)/tools/webidl_binder.py \
 		$< \
-		$(OGG_WEBIDL_GLUE_BASE)
-
-$(WEBM_WEBIDL_GLUE_JS): $(addprefix $(SRC_DIR)/,$(WEBM_WEBIDL)) $(LIB_BUILD_DIR)
-	python $(EMSCRIPTEN)/tools/webidl_binder.py \
-		$< \
-		$(WEBM_WEBIDL_GLUE_BASE)
+		$(WEBIDL_GLUE_BASE)
 
 # 1.3 Compile using emcc
-$(EMCC_OGG_OPUS_JS) $(EMCC_OGG_OPUS_JS:%.js=%.wasm) $(EMCC_OGG_OPUS_JS:%.js=%.wasm.map): $(SRC_OGG_OPUS_JS) $(OGG_WEBIDL_GLUE_JS) $(OGG_OPUS_SRC) $(OGG_OPUS_INCLUDE) $(OBJS)
+$(EMCC_OGG_OPUS_JS) $(EMCC_OGG_OPUS_JS:%.js=%.wasm) $(EMCC_OGG_OPUS_JS:%.js=%.wasm.map): $(SRC_OPUS_ENCODER_JS) $(WEBIDL_GLUE_JS) $(OGG_OPUS_SRC) $(OGG_OPUS_INCLUDE) $(OBJS)
 	emcc -o $(EMCC_OGG_OPUS_JS) \
 		$(EMCC_OPTS) \
 		-s EXPORTED_FUNCTIONS="[$(DEFAULT_EXPORTS),$(OPUS_EXPORTS),$(SPEEX_EXPORTS)]" \
@@ -149,7 +143,7 @@ $(EMCC_OGG_OPUS_JS) $(EMCC_OGG_OPUS_JS:%.js=%.wasm) $(EMCC_OGG_OPUS_JS:%.js=%.wa
 		--pre-js $< \
 		--post-js $(word 2,$^)
 
-$(EMCC_WEBM_OPUS_JS) $(EMCC_WEBM_OPUS_JS:%.js=%.wasm) $(EMCC_WEBM_OPUS_JS:%.js=%.wasm.map): $(SRC_WEBM_OPUS_JS) $(WEBM_WEBIDL_GLUE_JS) $(WEBM_OPUS_SRC) $(WEBM_INCLUDE) $(OBJS)
+$(EMCC_WEBM_OPUS_JS) $(EMCC_WEBM_OPUS_JS:%.js=%.wasm) $(EMCC_WEBM_OPUS_JS:%.js=%.wasm.map): $(SRC_OPUS_ENCODER_JS) $(WEBIDL_GLUE_JS) $(WEBM_OPUS_SRC) $(WEBM_OPUS_INCLUDE) $(OBJS)
 	emcc -o $(EMCC_WEBM_OPUS_JS) \
 		$(EMCC_OPTS) \
 		-s EXPORTED_FUNCTIONS="[$(DEFAULT_EXPORTS),$(OPUS_EXPORTS),$(SPEEX_EXPORTS)]" \

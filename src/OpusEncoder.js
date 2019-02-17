@@ -24,7 +24,7 @@ const OPUS_SET_BITRATE_REQUEST = 4002;
 // in speex_resampler.h
 const RESAMPLER_ERR_SUCCESS = 0;
 
-class _OggOpusEncoder {
+class _OpusEncoder {
   constructor (inputSampleRate, channelCount, bitsPerSecond = undefined) {
     this.config = {
       inputSampleRate, // Usually 44100Hz or 48000Hz
@@ -43,7 +43,7 @@ class _OggOpusEncoder {
     this._speex_resampler_process_interleaved_float = Module._speex_resampler_process_interleaved_float;
     this._speex_resampler_destroy = Module._speex_resampler_destroy;
     // Ogg container imported using WebIDL binding
-    this._container = new Module.OggContainer();
+    this._container = new Module.Container();
     this._container.init(OPUS_OUTPUT_SAMPLE_RATE, channelCount,
                          Math.floor(Math.random() * 0xFFFFFFFF));
 
@@ -103,7 +103,7 @@ class _OggOpusEncoder {
         if (packetLength < 0) {
           throw new Error('Opus encoding error.');
         }
-        // Input packget to Ogg page generator
+        // Input packget to Ogg or WebM page generator
         this._container.writeFrame(this.mOutputBuffer.pointer,
                                    packetLength,
                                    this.outputSamplePerChannel); // 960 samples
@@ -204,7 +204,7 @@ class _OggOpusEncoder {
  */
 Module.init = function (inputSampleRate, channelCount, bitsPerSecond) {
   Module.encodedBuffers = [];
-  Module.encoder = new _OggOpusEncoder(inputSampleRate, channelCount, bitsPerSecond);
+  Module.encoder = new _OpusEncoder(inputSampleRate, channelCount, bitsPerSecond);
 };
 
 Module.encode = function (buffers) {
@@ -212,6 +212,7 @@ Module.encode = function (buffers) {
 };
 
 Module.encodeFinalFrame = function () {
+  // Nothing to do
 };
 
 Module.flush = function () {

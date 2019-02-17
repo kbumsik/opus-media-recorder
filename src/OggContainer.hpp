@@ -52,7 +52,7 @@
  *      3. Copy buffers using the pointers manually.
  *      4. If producePacketPage() return non-zero value, iterate from step 1.
  */
-class OggContainer
+class Container
   : protected ContainerInterface
 {
 public:
@@ -63,8 +63,8 @@ public:
    * @param channel_count   The number of channels of the stream the maxium is 2.
    * @param serial          Uniqute number of the stream. Usually a random number.
    */
-  OggContainer();
-  ~OggContainer();
+  Container();
+  ~Container();
 
   void init(uint32_t sample_rate, uint8_t channel_count, int serial) override;
 

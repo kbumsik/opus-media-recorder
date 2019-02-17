@@ -5,7 +5,7 @@
 #include <cstring>
 #include "emscriptenImport.hpp"
 
-OggContainer::OggContainer()
+Container::Container()
   : ContainerInterface(),
     stream_state_(),
     page_(),
@@ -14,14 +14,14 @@ OggContainer::OggContainer()
   // Nothing to do
 }
 
-OggContainer::~OggContainer()
+Container::~Container()
 {
   writePacket(nullptr, 0, 0, true); // This does nothing but marks end_of_stream
   while (producePacketPage(true) != 0) {} // Produce the last page
   ogg_stream_clear(&stream_state_);
 }
 
-void OggContainer::init(uint32_t sample_rate, uint8_t channel_count, int serial)
+void Container::init(uint32_t sample_rate, uint8_t channel_count, int serial)
 {
   ContainerInterface::init(sample_rate, channel_count, serial);
 
@@ -43,12 +43,12 @@ void OggContainer::init(uint32_t sample_rate, uint8_t channel_count, int serial)
   produceCommentPage();
 }
 
-void OggContainer::writeFrame(void *data, std::size_t size, int num_samples)
+void Container::writeFrame(void *data, std::size_t size, int num_samples)
 {
   writePacket((uint8_t *)data, size, num_samples, false);
   while (producePacketPage(false) != 0) {}
 }
-void OggContainer::produceIDPage(void)
+void Container::produceIDPage(void)
 {
   std::vector<uint8_t> tmp_buffer(ID_OPUS_SIZE);
   uint8_t *header = &tmp_buffer[0];
@@ -62,7 +62,7 @@ void OggContainer::produceIDPage(void)
   }
 }
 
-void OggContainer::produceCommentPage(void)
+void Container::produceCommentPage(void)
 {
   std::vector<uint8_t> tmp_buffer(COMMENT_OPUS_SIZE);
   uint8_t *header = &tmp_buffer[0];
@@ -76,7 +76,7 @@ void OggContainer::produceCommentPage(void)
   }
 }
 
-int OggContainer::producePacketPage(bool force)
+int Container::producePacketPage(bool force)
 {
   /**
    * @brief Ogg page header format: https://tools.ietf.org/html/rfc3533#section-6
@@ -121,7 +121,7 @@ int OggContainer::producePacketPage(bool force)
   return result;
 }
 
-void OggContainer::writePacket(uint8_t *data, std::size_t size,
+void Container::writePacket(uint8_t *data, std::size_t size,
                               int num_samples, bool e_o_s)
 {
   if (ogg_stream_eos(&stream_state_)) {

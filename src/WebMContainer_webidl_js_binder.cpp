@@ -5,4 +5,4 @@
 
 #include "WebMContainer.hpp"
 // This is an auto-generated code by Emscripten located in /build directory.
-#include "WebMContainer.webidl_glue.cpp"
+#include "Container.webidl_glue.cpp"
