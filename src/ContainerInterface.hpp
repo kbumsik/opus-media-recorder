@@ -6,29 +6,33 @@
 #include <string>
 
 // See ContainerInterface::writeOpusIdHeader for more detail
-enum {
-  ID_OPUS_MAGIC_OFFSET = 0,
-  ID_OPUS_VER_OFFSET = 8,
-  ID_OPUS_CH_OFFSET = 9,
-  ID_OPUS_PRE_SKIP_OFFSET = 10,
-  ID_OPUS_SAMPLE_RATE_OFFSET = 12,
-  ID_OPUS_GAIN_OFFSET = 16,
-  ID_OPUS_MAPPING_FAMILY_OFFSET = 18,
-  ID_OPUS_SIZE = ID_OPUS_MAPPING_FAMILY_OFFSET + 1
-};
+namespace OpusIdHeaderType {
+  enum {
+    MAGIC_OFFSET = 0,
+    VER_OFFSET = 8,
+    CH_OFFSET = 9,
+    PRE_SKIP_OFFSET = 10,
+    SAMPLE_RATE_OFFSET = 12,
+    GAIN_OFFSET = 16,
+    MAPPING_FAMILY_OFFSET = 18,
+    SIZE = MAPPING_FAMILY_OFFSET + 1
+  };
+}
 
 // See ContainerInterface::writeOpusCommentHeader for more detail
-enum {
-  COMMENT_OPUS_MAGIC_OFFSET = 0,
-  COMMENT_OPUS_VENDOR_LEN_OFFSET = 8,
-  COMMENT_OPUS_VENDOR_STR_OFFSET = 12,
-  // COMMENT_OPUS_VENDOR_STR_OFFSET + 'opus-media-recorder'
-  COMMENT_OPUS_COMMENT_LIST_LEN_OFFSET = COMMENT_OPUS_VENDOR_STR_OFFSET + 19,
-  COMMENT_OPUS_COMMENT_0_LEN_OFFSET = COMMENT_OPUS_COMMENT_LIST_LEN_OFFSET +4,
-  COMMENT_OPUS_COMMENT_0_STR_OFFSET = COMMENT_OPUS_COMMENT_0_LEN_OFFSET +4,
-  // COMMENT_OPUS_COMMENT_0_STR_OFFSET + 'TITLE=recording'
-  COMMENT_OPUS_SIZE = COMMENT_OPUS_COMMENT_0_STR_OFFSET + 15
-};
+namespace OpusCommentHeaderType {
+  enum {
+    MAGIC_OFFSET = 0,
+    VENDOR_LEN_OFFSET = 8,
+    VENDOR_STR_OFFSET = 12,
+    // VENDOR_STR_OFFSET + 'opus-media-recorder'
+    COMMENT_LIST_LEN_OFFSET = VENDOR_STR_OFFSET + 19,
+    COMMENT_0_LEN_OFFSET = COMMENT_LIST_LEN_OFFSET +4,
+    COMMENT_0_STR_OFFSET = COMMENT_0_LEN_OFFSET +4,
+    // COMMENT_0_STR_OFFSET + 'TITLE=recording'
+    SIZE = COMMENT_0_STR_OFFSET + 15
+  };
+}
 
 class ContainerInterface
 {
@@ -52,10 +56,27 @@ public:
    * @param data          A pointer to the packet buffer
    * @param size          Byte size of the packet data
    * @param num_samples   if < 0, the packet is considered as metadata packet
-   * @param e_o_s         Set if this is the last packet
    */
   virtual void writeFrame(void *data, std::size_t size, int num_samples) = 0;
 
+  /**
+   * @brief   Exceptions to throw to Emscripten
+   *
+   *    Q: Why you throw an integer instead of std::expection?
+   *    A: In the WebAssembly environment, throwing an object to the host (JS)
+   *       is not a good idea (maybe throwing exception is a bad idea too)
+   *       because WebAssembly only knows integer type so the host receives
+   *       a pointer value instead of the object, which makes it hard to know
+   *       what kind of exception thrown. Therefore, throwing enumerated
+   *       integer is better in the Emscripten environment.
+   */
+  enum Exceptions {
+    BAD_ARGUMENTS = 1,
+    INIT_FAILED = 2,
+    ALREADY_CLOSED = 3,
+    BUFFER_ERR = 4,
+    UNEXPECTED_ERR = 255
+  };
 protected:
   uint32_t sample_rate_;
   uint8_t channel_count_;

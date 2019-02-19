@@ -1,4 +1,5 @@
 #include "ContainerInterface.hpp"
+#include <cassert>
 
 ContainerInterface::ContainerInterface()
   : sample_rate_(48000),
@@ -14,6 +15,13 @@ ContainerInterface::~ContainerInterface()
 
 void ContainerInterface::init(uint32_t sample_rate, uint8_t channel_count, int serial)
 {
+  // The container for Opus only supports 48000, other than this value must be
+  // a mistake by us, not user. Therefore it has to be caught using assert().
+  assert(sample_rate == 48000);
+  // channel_count can be an error by user. So throw instead of assert().
+  if (!(channel_count > 0 && channel_count <= 2)) {
+    throw BAD_ARGUMENTS;
+  }
   sample_rate_ = sample_rate;
   channel_count_ = channel_count;
 }
@@ -42,26 +50,29 @@ void ContainerInterface::writeOpusIdHeader(uint8_t *header)
    *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
    */
   // Reference for WebM: https://wiki.xiph.org/MatroskaOpus
+  using namespace std;
+  using namespace OpusIdHeaderType;
 
+  assert(header);
   // Magic Signature 'OpusHead'
-  const static std::string magic = "OpusHead";
-  std::memcpy(header + ID_OPUS_MAGIC_OFFSET, magic.c_str(), magic.size());
+  const static string magic = "OpusHead";
+  memcpy(header + MAGIC_OFFSET, magic.c_str(), magic.size());
   // The version must always be 1 (8 bits, unsigned).
-  header[ID_OPUS_VER_OFFSET] = 1;
+  header[VER_OFFSET] = 1;
   // Number of output channels (8 bits, unsigned).
-  header[ID_OPUS_CH_OFFSET] = channel_count_;
+  header[CH_OFFSET] = channel_count_;
   // Firefox seems to have problem with non-zero pre-skip.
   // Related topic: https://wiki.xiph.org/MatroskaOpus#Proposal_2:_Use_pre-skip_data_from_CodecPrivate
   const uint16_t pre_skip = 0;
-  std::memcpy(header + ID_OPUS_PRE_SKIP_OFFSET, &pre_skip, sizeof(uint16_t));
+  memcpy(header + PRE_SKIP_OFFSET, &pre_skip, sizeof(uint16_t));
   // The sampling rate of input source (32 bits, unsigned, little endian).
-  std::memcpy(header + ID_OPUS_SAMPLE_RATE_OFFSET, &sample_rate_, sizeof(uint32_t));
+  memcpy(header + SAMPLE_RATE_OFFSET, &sample_rate_, sizeof(uint32_t));
   // Output gain, an encoder should set this field to zero (16 bits, signed,
   // little endian).
   const uint16_t gain = 0;
-  std::memcpy(header + ID_OPUS_GAIN_OFFSET, &gain, sizeof(uint16_t));
+  memcpy(header + GAIN_OFFSET, &gain, sizeof(uint16_t));
   // Channel Mapping Family 0: mono or stereo (left, right). (8 bits, unsigned).
-  header[ID_OPUS_MAPPING_FAMILY_OFFSET] = 0;
+  header[MAPPING_FAMILY_OFFSET] = 0;
 }
 
 
@@ -94,28 +105,26 @@ void ContainerInterface::writeOpusCommentHeader(uint8_t *header)
    *  |                 User Comment #1 String Length                 |
    *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
    */
+  using namespace std;
+  using namespace OpusCommentHeaderType;
 
+  assert(header);
   // Magic Signature 'OpusTags'
-  const static std::string magic = "OpusTags";
-  std::memcpy(header + COMMENT_OPUS_MAGIC_OFFSET, magic.c_str(), magic.size());
+  const static string magic = "OpusTags";
+  memcpy(header + MAGIC_OFFSET, magic.c_str(), magic.size());
   // Vendor String 'opus-media-recorder'
-  const static std::string vendor = "opus-media-recorder";
+  const static string vendor = "opus-media-recorder";
   uint32_t vendor_size = vendor.size();
-  std::memcpy(header + COMMENT_OPUS_VENDOR_LEN_OFFSET,
-              &vendor_size, sizeof(uint32_t));
-  std::memcpy(header + COMMENT_OPUS_VENDOR_STR_OFFSET,
-              vendor.c_str(), vendor.size());
+  memcpy(header + VENDOR_LEN_OFFSET, &vendor_size, sizeof(uint32_t));
+  memcpy(header + VENDOR_STR_OFFSET, vendor.c_str(), vendor.size());
   // Comment list length = 1 (32 bits, unsigned, little endian)
   uint32_t list_length = 1;
-  std::memcpy(header + COMMENT_OPUS_COMMENT_LIST_LEN_OFFSET,
-              &list_length, sizeof(uint32_t));
+  memcpy(header + COMMENT_LIST_LEN_OFFSET, &list_length, sizeof(uint32_t));
   // User Comment
-  const static std::string title = "TITLE=recording";
+  const static string title = "TITLE=recording";
   // User Comment #i String Length (32 bits, unsigned, little endian)
   uint32_t title_size = title.size();
-  std::memcpy(header + COMMENT_OPUS_COMMENT_0_LEN_OFFSET,
-              &title_size, sizeof(uint32_t));
+  memcpy(header + COMMENT_0_LEN_OFFSET, &title_size, sizeof(uint32_t));
   // User Comment # 1 ['TITLE=recording']
-  std::memcpy(header + COMMENT_OPUS_COMMENT_0_STR_OFFSET,
-              title.c_str(), title.size());
+  memcpy(header + COMMENT_0_STR_OFFSET, title.c_str(), title.size());
 }

@@ -1,9 +1,10 @@
 #include "OggContainer.hpp"
+#include "emscriptenImport.hpp"
 #include <vector>
 #include <string>
 #include <cstdlib>
 #include <cstring>
-#include "emscriptenImport.hpp"
+#include <cassert>
 
 Container::Container()
   : ContainerInterface(),
@@ -27,7 +28,7 @@ void Container::init(uint32_t sample_rate, uint8_t channel_count, int serial)
 
   int result = ogg_stream_init(&stream_state_, serial);
   if (result != 0) {
-    throw "Ogg: Object initialization failed";
+    throw INIT_FAILED;
   }
 
   packet_.b_o_s = 1;
@@ -50,7 +51,7 @@ void Container::writeFrame(void *data, std::size_t size, int num_samples)
 }
 void Container::produceIDPage(void)
 {
-  std::vector<uint8_t> tmp_buffer(ID_OPUS_SIZE);
+  std::vector<uint8_t> tmp_buffer(OpusIdHeaderType::SIZE);
   uint8_t *header = &tmp_buffer[0];
   writeOpusIdHeader(header);
 
@@ -58,13 +59,13 @@ void Container::produceIDPage(void)
   writePacket(header, tmp_buffer.size(), -1);
   int result = producePacketPage(true);
   if (result == 0) {
-    throw "Ogg: Generating OggOpus ID page failed";
+    throw UNEXPECTED_ERR;
   }
 }
 
 void Container::produceCommentPage(void)
 {
-  std::vector<uint8_t> tmp_buffer(COMMENT_OPUS_SIZE);
+  std::vector<uint8_t> tmp_buffer(OpusCommentHeaderType::SIZE);
   uint8_t *header = &tmp_buffer[0];
   writeOpusCommentHeader(header);
 
@@ -72,7 +73,7 @@ void Container::produceCommentPage(void)
   writePacket(header, tmp_buffer.size(), -1);
   int result = producePacketPage(true);
   if (result == 0) {
-    throw "Ogg: Generating OggOpus Comment page failed";
+    throw UNEXPECTED_ERR;
   }
 }
 
@@ -110,13 +111,13 @@ int Container::producePacketPage(bool force)
   // result == 0 means no page to produce, or internal error has occurred.
   // You should NOT copy page in this case.
   // Nonzero value means operation successful.
-  if (result != 0) {
+  if (result == 0) {
+    if (ogg_stream_check(&stream_state_)) {
+      throw BUFFER_ERR;
+    }
+  } else {
     emscriptenPushBuffer(page_.header, page_.header_len);
     emscriptenPushBuffer(page_.body, page_.body_len);
-  } else {
-    if (ogg_stream_check(&stream_state_)) {
-      throw "Ogg: Internal Error occurred";
-    }
   }
   return result;
 }
@@ -124,8 +125,9 @@ int Container::producePacketPage(bool force)
 void Container::writePacket(uint8_t *data, std::size_t size,
                               int num_samples, bool e_o_s)
 {
+  assert(!(data == nullptr && size > 0));
   if (ogg_stream_eos(&stream_state_)) {
-    throw "Ogg: Object is already flagged as end-of-stream";
+    throw ALREADY_CLOSED;
   }
 
   // After setting End-Of-Stream, there must be no more packet to write
@@ -146,7 +148,7 @@ void Container::writePacket(uint8_t *data, std::size_t size,
 
   int result = ogg_stream_packetin(&stream_state_, &packet_);
   if (result != 0) {
-    throw "Ogg: Putting the stream failed";
+    throw BUFFER_ERR;
   }
 
   // Begingging-Of-Stream must be cleared after the first page

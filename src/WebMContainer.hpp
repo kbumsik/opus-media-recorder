@@ -40,10 +40,7 @@ class Container
     mkvmuxer::int64 position_;
     // The MkvMuxer active element.
     mkvmuxer::Segment segment_;
-    // Flag to force the next call to a |segment_| method to return false.
-    bool force_one_libwebm_error_;
-    uint64_t first_frame_timestamp_audio_;
-    uint64_t most_recent_timestamp_;
+    uint64_t timestamp_;
     uint64_t track_number_;
 };
 
