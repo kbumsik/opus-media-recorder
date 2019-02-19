@@ -44,6 +44,9 @@ module.exports = {
   entry: {
     encoderWorker: './src/encoderWorker.js'
   },
+  node: {
+    fs: 'empty'
+  },
   mode: 'development',
   module: {
     rules: [

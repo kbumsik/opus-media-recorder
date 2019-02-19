@@ -51,21 +51,22 @@ endif
 
 # Emscripten compiler (emcc) options
 EMCC_OPTS = -std=c++11 \
-			-g4 \
-			-O1 \
+			-DNDEBUG \
+			-Oz \
+			--llvm-opts 3 \
 			--llvm-lto 1 \
 			-s WASM=1 \
 			-s MODULARIZE=1 \
-			-s DETERMINISTIC=1 \
 			-s FILESYSTEM=0 \
-			-s NO_DYNAMIC_EXECUTION=1 \
 			-s MALLOC="emmalloc" \
-			-s DISABLE_EXCEPTION_CATCHING=0 \
 			--source-map-base http://localhost:$(DEV_SERVER_PORT)/
-			# -s EXPORT_ES6=1
-			# -s ENVIRONMENT='worker'
-			# -s "BINARYEN_METHOD='native-wasm'" \
-			# --closure 1
+			# -s EXPORT_ES6=1 -- I'm not using ES6 import yet.
+			# -s ENVIRONMENT='worker' -- Enabling it will delete node.js
+			#							 codes like require('fs') needed by
+			#							 some dunblers like browserify.
+			# -s "BINARYEN_METHOD='asmjs,native-wasm'" -- In case we need asm.js
+			# --closure 1 -- Gets error
+			# -s NO_DYNAMIC_EXECUTION=1 -- Seems to be only for asm.js
 
 DEFAULT_EXPORTS:='_malloc','_free'
 OPUS_EXPORTS:='_opus_encoder_create', \
@@ -88,10 +89,19 @@ EMCC_INCLUDE_DIR = $(SRC_DIR) \
 					$(LIB_BUILD_DIR) \
 					./
 
-# Emscripten options for production
-ifdef PRODUCTION
-	EMCC_OPTS := $(filter-out -g4,$(EMCC_OPTS))
-	EMCC_OPTS := $(filter-out "-s DETERMINISTIC=1",$(EMCC_OPTS))
+# Emscripten options for Debugging
+ifndef PRODUCTION
+	EMCC_OPTS +=	-g4 \
+					-s EXCEPTION_DEBUG=1 \
+				 	-s DISABLE_EXCEPTION_CATCHING=0 \
+					-s STACK_OVERFLOW_CHECK=1 \
+					-s VERBOSE=1 \
+					-s DETERMINISTIC=1 \
+					-s RUNTIME_LOGGING=1 \
+					-s ALLOW_MEMORY_GROWTH=1
+					# -s "TOTAL_STACK=5*1024*1024"
+					# -s "TOTAL_MEMORY=16777216"
+	EMCC_OPTS := $(filter-out -DNDEBUG,$(EMCC_OPTS))
 endif
 
 # C compiled static libraries
