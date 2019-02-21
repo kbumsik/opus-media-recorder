@@ -78,10 +78,7 @@ void Container::ElementStartNotify(mkvmuxer::uint64 element_id,
 void Container::addTrack(void)
 {
   track_number_ = segment_.AddAudioTrack(sample_rate_, channel_count_, 0);
-  if (track_number_ <= 0) {
-    // Error adding audio track
-    throw INIT_FAILED;
-  }
+  assert(track_number_ > 0); // Init failed
 
   mkvmuxer::AudioTrack* const audio_track =
       reinterpret_cast<mkvmuxer::AudioTrack*>(
@@ -94,9 +91,8 @@ void Container::addTrack(void)
   uint8_t opus_header[OpusCommentHeaderType::SIZE];
   writeOpusIdHeader(opus_header);
 
-  if (!audio_track->SetCodecPrivate(opus_header, OpusCommentHeaderType::SIZE)) {
-    throw INIT_FAILED;
-  }
+  // Init failed
+  assert(audio_track->SetCodecPrivate(opus_header, OpusCommentHeaderType::SIZE));
 
   // Segment's timestamps should be in milliseconds
   // See http://www.webmproject.org/docs/container/#muxer-guidelines

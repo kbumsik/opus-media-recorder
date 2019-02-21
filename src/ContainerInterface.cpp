@@ -18,10 +18,8 @@ void ContainerInterface::init(uint32_t sample_rate, uint8_t channel_count, int s
   // The container for Opus only supports 48000, other than this value must be
   // a mistake by us, not user. Therefore it has to be caught using assert().
   assert(sample_rate == 48000);
-  // channel_count can be an error by user. So throw instead of assert().
-  if (!(channel_count > 0 && channel_count <= 2)) {
-    throw BAD_ARGUMENTS;
-  }
+  // It supports up to 2 channels for now
+  assert(channel_count > 0 && channel_count <= 2);
   sample_rate_ = sample_rate;
   channel_count_ = channel_count;
 }

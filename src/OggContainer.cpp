@@ -27,9 +27,7 @@ void Container::init(uint32_t sample_rate, uint8_t channel_count, int serial)
   ContainerInterface::init(sample_rate, channel_count, serial);
 
   int result = ogg_stream_init(&stream_state_, serial);
-  if (result != 0) {
-    throw INIT_FAILED;
-  }
+  assert(result == 0);  // Init failed
 
   packet_.b_o_s = 1;
   packet_.e_o_s = 0;
@@ -58,9 +56,7 @@ void Container::produceIDPage(void)
   // Produce an OGG page
   writePacket(header, tmp_buffer.size(), -1);
   int result = producePacketPage(true);
-  if (result == 0) {
-    throw UNEXPECTED_ERR;
-  }
+  assert(result != 0); // Unexpected error
 }
 
 void Container::produceCommentPage(void)
@@ -72,9 +68,7 @@ void Container::produceCommentPage(void)
   // Produce an OGG page
   writePacket(header, tmp_buffer.size(), -1);
   int result = producePacketPage(true);
-  if (result == 0) {
-    throw UNEXPECTED_ERR;
-  }
+  assert(result != 0);  // Unexpected error
 }
 
 int Container::producePacketPage(bool force)
@@ -112,9 +106,7 @@ int Container::producePacketPage(bool force)
   // You should NOT copy page in this case.
   // Nonzero value means operation successful.
   if (result == 0) {
-    if (ogg_stream_check(&stream_state_)) {
-      throw BUFFER_ERR;
-    }
+    assert(!ogg_stream_check(&stream_state_)); // Allocation error
   } else {
     emscriptenPushBuffer(page_.header, page_.header_len);
     emscriptenPushBuffer(page_.body, page_.body_len);
@@ -125,10 +117,8 @@ int Container::producePacketPage(bool force)
 void Container::writePacket(uint8_t *data, std::size_t size,
                               int num_samples, bool e_o_s)
 {
-  assert(!(data == nullptr && size > 0));
-  if (ogg_stream_eos(&stream_state_)) {
-    throw ALREADY_CLOSED;
-  }
+  assert(!(data == nullptr && size > 0)); // No copy more than zero over null
+  assert(!ogg_stream_eos(&stream_state_)); // Already end-of-stream
 
   // After setting End-Of-Stream, there must be no more packet to write
   if (e_o_s) {
@@ -147,9 +137,7 @@ void Container::writePacket(uint8_t *data, std::size_t size,
   }
 
   int result = ogg_stream_packetin(&stream_state_, &packet_);
-  if (result != 0) {
-    throw BUFFER_ERR;
-  }
+  assert(result == 0); // Allocation error
 
   // Begingging-Of-Stream must be cleared after the first page
   if (packet_.b_o_s) {

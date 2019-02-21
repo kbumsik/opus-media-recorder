@@ -50,8 +50,10 @@ endif
 # Reference: https://github.com/kripken/emscripten/blob/master/src/settings.js
 
 # Emscripten compiler (emcc) options
+export EMCC_DEBUG=1
 EMCC_OPTS = -std=c++11 \
 			-DNDEBUG \
+			-fno-exceptions \
 			-Oz \
 			--llvm-opts 3 \
 			--llvm-lto 1 \
@@ -66,7 +68,7 @@ EMCC_OPTS = -std=c++11 \
 			#							 some dunblers like browserify.
 			# -s "BINARYEN_METHOD='asmjs,native-wasm'" -- In case we need asm.js
 			# --closure 1 -- Gets error
-			# -s NO_DYNAMIC_EXECUTION=1 -- Seems to be only for asm.js
+			# -s DYNAMIC_EXECUTION=0 -- Seems to be only for asm.js
 
 DEFAULT_EXPORTS:='_malloc','_free'
 OPUS_EXPORTS:='_opus_encoder_create', \
@@ -93,12 +95,13 @@ EMCC_INCLUDE_DIR = $(SRC_DIR) \
 ifndef PRODUCTION
 	EMCC_OPTS +=	-g4 \
 					-s EXCEPTION_DEBUG=1 \
-				 	-s DISABLE_EXCEPTION_CATCHING=0 \
+					-s ASSERTIONS=2 \
 					-s STACK_OVERFLOW_CHECK=1 \
 					-s VERBOSE=1 \
 					-s DETERMINISTIC=1 \
 					-s RUNTIME_LOGGING=1 \
 					-s ALLOW_MEMORY_GROWTH=1
+				 	# -s DISABLE_EXCEPTION_CATCHING=0 \
 					# -s "TOTAL_STACK=5*1024*1024"
 					# -s "TOTAL_MEMORY=16777216"
 	EMCC_OPTS := $(filter-out -DNDEBUG,$(EMCC_OPTS))

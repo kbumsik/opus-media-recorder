@@ -59,24 +59,6 @@ public:
    */
   virtual void writeFrame(void *data, std::size_t size, int num_samples) = 0;
 
-  /**
-   * @brief   Exceptions to throw to Emscripten
-   *
-   *    Q: Why you throw an integer instead of std::expection?
-   *    A: In the WebAssembly environment, throwing an object to the host (JS)
-   *       is not a good idea (maybe throwing exception is a bad idea too)
-   *       because WebAssembly only knows integer type so the host receives
-   *       a pointer value instead of the object, which makes it hard to know
-   *       what kind of exception thrown. Therefore, throwing enumerated
-   *       integer is better in the Emscripten environment.
-   */
-  enum Exceptions {
-    BAD_ARGUMENTS = 1,
-    INIT_FAILED = 2,
-    ALREADY_CLOSED = 3,
-    BUFFER_ERR = 4,
-    UNEXPECTED_ERR = 255
-  };
 protected:
   uint32_t sample_rate_;
   uint8_t channel_count_;
