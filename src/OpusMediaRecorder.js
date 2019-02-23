@@ -1,4 +1,6 @@
 const { EventTarget, defineEventAttribute } = require('event-target-shim');
+const { detect } = require('detect-browser');
+const browser = detect();
 
 const AudioContext = global.AudioContext || global.webkitAudioContext;
 const BUFFER_SIZE = 4096;
@@ -59,19 +61,55 @@ class OpusMediaRecorder extends EventTarget {
       case 'wave':
       case 'wav':
         this._mimeType = 'audio/wave';
-        this._wasmPath = ''; // wasm is not used
         break;
 
       case 'webm':
         this._mimeType = 'audio/webm';
-        this._wasmPath = WebMOpusEncoderWasmPath || '';
         break;
 
       case 'ogg':
-      default:
         this._mimeType = 'audio/ogg';
+        break;
+
+      default:
+        // Select a type depending on OS.
+        switch (browser && browser.name) {
+          case 'chrome':
+            this._mimeType = 'audio/webm';
+            break;
+
+          case 'firefox':
+            this._mimeType = 'audio/ogg';
+            break;
+
+          case 'edge':
+            this._mimeType = 'audio/webm';
+            break;
+
+          case 'ios':
+          case 'safari':
+            this._mimeType = 'audio/wave';
+            break;
+
+          default:
+            this._mimeType = 'audio/webm';
+        }
+    }
+    switch (this._mimeType) {
+      case 'audio/wave':
+        this._wasmPath = ''; // wasm is not used
+        break;
+
+      case 'audio/webm':
+        this._wasmPath = WebMOpusEncoderWasmPath || '';
+        break;
+
+      case 'audio/ogg':
         this._wasmPath = OggOpusEncoderWasmPath || '';
         break;
+
+      default:
+        throw new Error(`Internal Error: Unexpected MIME Type: ${this._mimeType}`);
     }
 
     // Get current directory for worker
@@ -513,7 +551,7 @@ class OpusMediaRecorder extends EventTarget {
 // MS Edge specific monkey patching:
 // onaudioprocess callback cannot be triggered more than twice when postMessage
 // uses the seconde transfer argument. So disable the transfer argument only in Edge.
-if (/Edge/.test(navigator.userAgent)) {
+if (browser && browser.name === 'edge') {
   (function () {
     var original = Worker.prototype.postMessage;
     Worker.prototype.postMessage = function (message, transfer = null) {

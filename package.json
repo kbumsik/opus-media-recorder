@@ -7,11 +7,18 @@
   "description": "MedialRecorer polyfill for Opus recording using WebAssembly",
   "main": "OpusMediaRecorder.js",
   "files": [
-    "OpusMediaRecorder.js", "OpusMediaRecorder.umd.js",
-    "encoderWorker.js", "encoderWorker.umd.js",
-    "OggOpusEncoder.js", "OggOpusEncoder.wasm", "OggOpusEncoder.bin",
-    "WebMOpusEncoder.js", "WebMOpusEncoder.wasm", "WebMOpusEncoder.bin",
-    "WaveEncoder.js", "commonFunctions.js"
+    "OpusMediaRecorder.js",
+    "OpusMediaRecorder.umd.js",
+    "encoderWorker.js",
+    "encoderWorker.umd.js",
+    "OggOpusEncoder.js",
+    "OggOpusEncoder.wasm",
+    "OggOpusEncoder.bin",
+    "WebMOpusEncoder.js",
+    "WebMOpusEncoder.wasm",
+    "WebMOpusEncoder.bin",
+    "WaveEncoder.js",
+    "commonFunctions.js"
   ],
   "repository": {
     "type": "git",
@@ -44,6 +51,7 @@
     "clean": "make clean"
   },
   "dependencies": {
+    "detect-browser": "^4.1.0",
     "event-target-shim": "^3.0.2"
   },
   "devDependencies": {

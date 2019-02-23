@@ -33,10 +33,15 @@ opus-media-recorder is compatible with the [Mediastream Recording API](https://d
 
 * The page must be served over HTTPS in order to record.
 * Being able to record does *not always* mean you can play it on browsers:
-  * macOS/iOS Safari cannot play Ogg Opus natively yet.
-  * Edge requires [an extension](https://wpdev.uservoice.com/forums/257854-microsoft-edge-developer/suggestions/6513488-ogg-vorbis-and-opus-audio-formats-support-firefox) to play Ogg Opus natively.
+  * macOS/iOS Safari cannot play Opus natively yet.
+  * Old Edge requires [an extension](https://wpdev.uservoice.com/forums/257854-microsoft-edge-developer/suggestions/6513488-ogg-vorbis-and-opus-audio-formats-support-firefox) to play Opus natively.
   * You can get an Opus decorder to play it. There are Opus decoders available, such as [Chris Rudmin's Opus decoder](https://github.com/chris-rudmin/opus-recorder).
   * Otherwise, users can download as a file and play it using apps like [VLC](https://www.videolan.org/vlc/index.html).
+* When `mimeType` is not specified a default encoder is loading depending on OS:
+  * Chrome: `audio/webm`
+  * Firefox: `audio/ogg`
+  * Edge: `audio/webm`
+  * iOS/macOS Safari: `audio/wave` - because they cannot play Opus at all.
 
 ### JavaScript
 
