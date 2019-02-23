@@ -5,10 +5,18 @@
 
 # Change the port you like. You can run the dev server by using "make run"
 DEV_SERVER_PORT := 9000
+# Used by build-docs target
+ifdef PRODUCTION
+	export BASE_URL := https://cdn.jsdelivr.net/npm/opus-media-recorder@latest
+else
+	export BASE_URL := https://localhost:$(DEV_SERVER_PORT)
+endif
 
 # Path Settings
-LIB_DIR := lib
-SRC_DIR := src
+LIB_DIR := $(abspath lib)
+SRC_DIR := $(abspath src)
+EXAMPLE_DIR := $(abspath example)
+DOCS_DIR := $(abspath docs)
 # This is used by /lib/Makefile
 export BUILD_DIR := $(abspath build)
 export LIB_BUILD_DIR := $(abspath $(BUILD_DIR)/emscripten)
@@ -39,9 +47,9 @@ ifndef PRODUCTION
 endif
 
 ifdef PRODUCTION
-all: check_emcc $(FINAL_TARGETS_BUILD) $(FINAL_TARGETS_DIST)
+all: check_emcc $(FINAL_TARGETS_BUILD) $(FINAL_TARGETS_DIST) build-docs
 else
-all: check_emcc $(FINAL_TARGETS_BUILD)
+all: check_emcc $(FINAL_TARGETS_BUILD) build-docs
 endif
 
 ################################################################################
@@ -188,7 +196,7 @@ $(DIST_DIR)/%.bin: $(BUILD_DIR)/%.wasm
 # etc.
 ################################################################################
 
-.PHONY : all check_emcc run clean-lib clean-js clean
+.PHONY : all check_emcc serve build-docs clean-lib clean-js clean
 
 ifndef EMSCRIPTEN
   $(error EMSCRIPTEN is undefined. Enable Escripten SDK.)
@@ -212,6 +220,9 @@ check_emcc:
 
 $(BUILD_DIR) $(LIB_BUILD_DIR):
 	mkdir -p $@
+
+build-docs:
+	OUTPUT_DIR=$(DOCS_DIR) make -C $(EXAMPLE_DIR)/example_template
 
 serve: all
 	# Run server
