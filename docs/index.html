@@ -1,6 +1,10 @@
-<html><head>
+<html>
+  <head>
     <!-- Global Site Tag (gtag.js) - Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-53338732-3"></script>
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=UA-53338732-3"
+    ></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag() {
@@ -11,24 +15,31 @@
     </script>
 
     <!-- For mobile -->
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>opus-media-recorder Example</title>
     <link href="main.css" rel="stylesheet">
     <style>
     </style>
-  <link rel="stylesheet" href="main.css">
-<link rel="stylesheet" href="octocat.css">
-</head>
+  </head>
 
   <body>
     <!-- Fork me on Github! Thanks tholman: https://github.com/tholman/github-corners -->
-    <a class="github-corner" href="https://github.com/kbumsik/opus-media-recorder" aria-label="View source on GitHub">
+    <a class="github-corner"
+      href="https://github.com/kbumsik/opus-media-recorder"
+      aria-label="View source on GitHub">
       <link href="octocat.css" rel="stylesheet">
       <span>Fork me on GitHub!</span>
-      <svg aria-hidden="true" viewBox="0 0 125 125" height="40" width="40">
+      <svg aria-hidden="true"
+        viewBox="0 0 125 125"
+        height="40"
+        width="40">
         <path d="M0,0 V125 H125 V0 Z"/>
-        <path d="m 49.072475,111.35284 c -16.82914,3.67695 -20.29396,-7.14179 -20.29396,-7.14179 -2.75772,-7.000356 -6.71751,-8.838831 -6.71751,-8.838831 -5.58615,-3.74766 0.42426,-3.67695 0.42426,-3.67695 6.01041,0.49497 9.2631,6.293245 9.2631,6.293245 5.44472,9.121676 13.93,6.717506 17.53625,4.949746" style="fill:currentColor" class="octo-arm"/>
-        <path style="fill:currentColor" d="m 43.910605,125 c 0,0.14142 3.67695,-1.55564 3.67695,-3.11127 l 0.0707,-19.58687 c 0.56569,-3.959796 2.12132,-6.646796 3.88909,-8.131721 -13.43503,-1.55563 -27.50646,-6.71751 -27.57717,-29.839903 0.0707,-6.576093 2.40417,-12.020815 6.29325,-16.192745 -0.7071,-1.555635 -2.75771,-7.707464 0.56569,-15.980614 0,0 5.02046,-1.626345 16.61701,6.151829 4.73761,-1.343502 9.89949,-1.979899 15.06137,-2.050609 5.09117,0 10.32376,0.707107 15.13209,2.12132 11.52584,-7.848885 16.61701,-6.29325 16.61701,-6.29325 3.25269,8.34386 1.20208,14.495689 0.56568,15.980613 3.889078,4.313351 6.222515,9.616652 6.222515,16.263456 0,23.193103 -14.142105,28.284273 -27.577135,29.839903 2.12132,1.838485 4.10122,5.515435 4.10122,11.172291 l -0.0707,16.47559 c 0,1.69705 4.24264,3.39411 4.31335,3.18198 z" class="octo-body"/>
+        <path d="m 49.072475,111.35284 c -16.82914,3.67695 -20.29396,-7.14179 -20.29396,-7.14179 -2.75772,-7.000356 -6.71751,-8.838831 -6.71751,-8.838831 -5.58615,-3.74766 0.42426,-3.67695 0.42426,-3.67695 6.01041,0.49497 9.2631,6.293245 9.2631,6.293245 5.44472,9.121676 13.93,6.717506 17.53625,4.949746"
+          style="fill:currentColor"
+          class="octo-arm"/>
+        <path style="fill:currentColor"
+          d="m 43.910605,125 c 0,0.14142 3.67695,-1.55564 3.67695,-3.11127 l 0.0707,-19.58687 c 0.56569,-3.959796 2.12132,-6.646796 3.88909,-8.131721 -13.43503,-1.55563 -27.50646,-6.71751 -27.57717,-29.839903 0.0707,-6.576093 2.40417,-12.020815 6.29325,-16.192745 -0.7071,-1.555635 -2.75771,-7.707464 0.56569,-15.980614 0,0 5.02046,-1.626345 16.61701,6.151829 4.73761,-1.343502 9.89949,-1.979899 15.06137,-2.050609 5.09117,0 10.32376,0.707107 15.13209,2.12132 11.52584,-7.848885 16.61701,-6.29325 16.61701,-6.29325 3.25269,8.34386 1.20208,14.495689 0.56568,15.980613 3.889078,4.313351 6.222515,9.616652 6.222515,16.263456 0,23.193103 -14.142105,28.284273 -27.577135,29.839903 2.12132,1.838485 4.10122,5.515435 4.10122,11.172291 l -0.0707,16.47559 c 0,1.69705 4.24264,3.39411 4.31335,3.18198 z"
+          class="octo-body"/>
       </svg>
     </a>
 
@@ -42,7 +53,8 @@
     <section class="description">
       <p>
         <code>opus-media-recorder</code> is a
-        <a href="https://w3c.github.io/mediacapture-record/#mediarecorder-api" rel="nofollow">MediaRecorder API</a>
+        <a href="https://w3c.github.io/mediacapture-record/#mediarecorder-api"
+            rel="nofollow">MediaRecorder API</a>
         polyfill written in JavaScript and C++ (WebAssembly). It aims a
         cross-browser Opus codec support with various audio formats such
         as Ogg and WebM. This page is designed to test
@@ -50,7 +62,8 @@
       </p>
       <p>
         For more information, please visit
-        <a href="https://github.com/kbumsik/opus-media-recorder" rel="nofollow">the main page</a>.
+        <a href="https://github.com/kbumsik/opus-media-recorder"
+          rel="nofollow">the main page</a>.
       </p>
     </section>
 
@@ -62,7 +75,7 @@
         <div>
           <label for="mimeSelect">MIME Type</label>
           <select id="mimeSelect" class="mime-select">
-            <option value>default (audio/ogg)</option>
+            <option value="" id="defaultMime">default</option>
             <option value="audio/ogg">audio/ogg</option>
             <option value="audio/webm">audio/webm</option>
             <option value="audio/wave">audio/wave</option>
@@ -71,7 +84,8 @@
         </div>
         <div>
           <label for="timeSlice">timeslice (in milliseconds)</label>
-          <input id="timeSlice" class="timeslice-input" type="number" step="100" value="10000">
+          <input id="timeSlice" class="timeslice-input"
+            type="number" step="100" value="60000" />
         </div>
     </section>
 
@@ -82,7 +96,7 @@
         </header>
         <!-- MediaRecorder status indicator -->
         <div class="status">
-          <span id="status">Stream not created. Click &quot;create&quot; button.</span>
+          <span id="status">Stream not created. Click "create" button.</span>
         </div>
         <div class="buttons">
           <button id="buttonCreate">create</button>
@@ -116,7 +130,9 @@
           <p>
             Note: Microphone recording will not work on third-party browsers of
             iOS like Chrome for iOS. See issue
-            <a href="https://github.com/kbumsik/opus-media-recorder/issues/1">#1</a>.
+            <a href="https://github.com/kbumsik/opus-media-recorder/issues/1"
+              >#1</a
+            >.
           </p>
         </div>
     </section>
@@ -136,9 +152,9 @@
     <!-- <script src="encoderWorker.umd.js"></script> -->
 
     <!-- <script src="example.js"></script> -->
-  
 
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/OpusMediaRecorder.umd.js"></script>
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/encoderWorker.umd.js"></script>
-<script type="text/javascript" src="example.js"></script>
-</body></html>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/OpusMediaRecorder.umd.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/opus-media-recorder@latest/encoderWorker.umd.js"></script>
+    <script type="text/javascript" src="example.js"></script>
+  </body>
+</html>

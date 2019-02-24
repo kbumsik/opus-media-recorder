@@ -75,7 +75,7 @@
         <div>
           <label for="mimeSelect">MIME Type</label>
           <select id="mimeSelect" class="mime-select">
-            <option value="">default (audio/ogg)</option>
+            <option value="" id="defaultMime">default</option>
             <option value="audio/ogg">audio/ogg</option>
             <option value="audio/webm">audio/webm</option>
             <option value="audio/wave">audio/wave</option>
@@ -85,7 +85,7 @@
         <div>
           <label for="timeSlice">timeslice (in milliseconds)</label>
           <input id="timeSlice" class="timeslice-input"
-            type="number" step="100" value="10000" />
+            type="number" step="100" value="60000" />
         </div>
     </section>
 
@@ -152,5 +152,7 @@
     <!-- <script src="encoderWorker.umd.js"></script> -->
 
     <!-- <script src="example.js"></script> -->
+
+    <@POST_HTML@>
   </body>
 </html>

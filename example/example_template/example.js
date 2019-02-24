@@ -17,6 +17,7 @@ let buttonStop = document.querySelector('#buttonStop');
 let buttonStopTracks = document.querySelector('#buttonStopTracks'); // For debugging purpose
 // User-selectable option
 let mimeSelect = document.querySelector('#mimeSelect');
+let defaultMime = document.querySelector('#defaultMime');
 let mimeSelectValue = '';
 mimeSelect.onchange = (e) => { mimeSelectValue = e.target.value; };
 let timeSlice = document.querySelector('#timeSlice');
@@ -101,8 +102,8 @@ function initButtons () {
   };
 }
 
-// Check compatibility
-window.addEventListener('load', _ => {
+// Check platform
+window.addEventListener('load', function checkPlatform () {
   // Check compatibility
   if (window.OpusMediaRecorder === undefined) {
     console.error('No OpusMediaRecorder found');
@@ -122,6 +123,25 @@ window.addEventListener('load', _ => {
           ? 'supported' : 'NOT supported'));
     });
   }
+
+  // Check default MIME audio format for the client's platform
+  // To do this, create captureStream() polyfill.
+  function getStream (mediaElement) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const context = new AudioContext();
+    const source = context.createMediaElementSource(mediaElement);
+    const destination = context.createMediaStreamDestination();
+
+    source.connect(destination);
+    source.connect(context.destination);
+
+    return destination.stream;
+  }
+
+  // When creating MediaRecorder object without mimeType option, the API will
+  //  decide the default MIME Type depending on the browser running.
+  let tmpRec = new MediaRecorder(getStream(new Audio('sample.mp3')), {}, workerOptions);
+  defaultMime.innerHTML = `default: ${tmpRec.mimeType} (Browser dependant)`;
 }, false);
 
 // Update state of buttons when any buttons clicked
