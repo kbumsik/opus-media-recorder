@@ -60,7 +60,6 @@ endif
 # Emscripten compiler (emcc) options
 export EMCC_DEBUG=1
 EMCC_OPTS = -std=c++11 \
-			-DNDEBUG \
 			-fno-exceptions \
 			-Oz \
 			--llvm-opts 3 \
@@ -77,6 +76,7 @@ EMCC_OPTS = -std=c++11 \
 			# -s "BINARYEN_METHOD='asmjs,native-wasm'" -- In case we need asm.js
 			# --closure 1 -- Gets error
 			# -s DYNAMIC_EXECUTION=0 -- Seems to be only for asm.js
+			# -DNDEBUG -- This will casue Firefox unable to play WebM - See Issue #9.
 
 DEFAULT_EXPORTS:='_malloc','_free'
 OPUS_EXPORTS:='_opus_encoder_create', \
