@@ -1,6 +1,6 @@
 {
   "name": "opus-media-recorder",
-  "version": "0.7.9",
+  "version": "0.7.10",
   "author": "Bumsik Kim",
   "license": "MIT",
   "homepage": "https://github.com/kbumsik/opus-media-recorder",
@@ -68,6 +68,7 @@
     "eslint-plugin-promise": "^4.0.1",
     "eslint-plugin-standard": "^3.1.0",
     "jsdoc": "^3.5.5",
+    "magic-string": "^0.25.2",
     "webpack": "^4.28.4",
     "webpack-cli": "^3.2.1",
     "webpack-dev-server": "^3.1.14",
