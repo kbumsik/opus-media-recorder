@@ -223,6 +223,7 @@ $(BUILD_DIR) $(LIB_BUILD_DIR):
 
 build-docs:
 	OUTPUT_DIR=$(DOCS_DIR) make -C $(EXAMPLE_DIR)/example_template
+	OUTPUT_DIR=$(EXAMPLE_DIR)/webpack make -C $(EXAMPLE_DIR)/example_template
 
 serve: all
 	# Run server

@@ -1,16 +1,17 @@
 import OpusMediaRecorder from 'opus-media-recorder';
-import Worker from 'opus-media-recorder/encoderWorker.js';
+import EncoderWorker from 'opus-media-recorder/encoderWorker.js';
 import OggOpusWasm from 'opus-media-recorder/OggOpusEncoder.wasm';
 import WebMOpusWasm from 'opus-media-recorder/WebMOpusEncoder.wasm';
 
-// Polyfill MediaRecorder
-window.MediaRecorder = OpusMediaRecorder;
 // Non-standard options
 const workerOptions = {
-  encoderWorkerFactory: _ => new Worker(),
+  encoderWorkerFactory: _ => new EncoderWorker(),
   OggOpusEncoderWasmPath: OggOpusWasm,
   WebMOpusEncoderWasmPath: WebMOpusWasm
 };
+
+// Polyfill MediaRecorder
+window.MediaRecorder = OpusMediaRecorder;
 
 // Recorder object
 let recorder;
@@ -23,6 +24,7 @@ let buttonStop = document.querySelector('#buttonStop');
 let buttonStopTracks = document.querySelector('#buttonStopTracks'); // For debugging purpose
 // User-selectable option
 let mimeSelect = document.querySelector('#mimeSelect');
+let defaultMime = document.querySelector('#defaultMime');
 let mimeSelectValue = '';
 mimeSelect.onchange = (e) => { mimeSelectValue = e.target.value; };
 let timeSlice = document.querySelector('#timeSlice');
@@ -38,24 +40,25 @@ buttonCreate.onclick = () => {
     .then((stream) => {
       if (recorder && recorder.state !== 'inactive') {
         console.log('Stop the recorder first');
-        throw new Error('');
+        throw new Error('Stop the recorder first');
       }
       return stream;
     })
     .then(createMediaRecorder)
-    .catch(_ => console.log('MediaRecorder is failed!!'))
+    .catch(e => {
+      console.log(`MediaRecorder is failed: ${e.message}`);
+      Promise.reject(new Error());
+    })
     .then(printStreamInfo) // Just for debugging purpose.
     .then(_ => console.log('Creating MediaRecorder is successful.'))
     .then(initButtons)
-    .then(updateButtonState)
-    .catch(_ => console.log('Error after creating a MediaRecorder object. ' +
-      'Recording should still works.'));
+    .then(updateButtonState);
 };
 
 function createMediaRecorder (stream) {
   // Create recorder object
-  let config = { mimeType: mimeSelectValue };
-  recorder = new MediaRecorder(stream, config, workerOptions);
+  let options = { mimeType: mimeSelectValue };
+  recorder = new MediaRecorder(stream, options, workerOptions);
 
   let dataChunks = [];
   // Recorder Event Handlers
@@ -106,12 +109,13 @@ function initButtons () {
   };
 }
 
-// Overriding console.log
-document.addEventListener('DOMContentLoaded', _ => {
-  // Check compability
-  if (window.MediaRecorder === undefined) {
-    console.error('No MediaRecorder found');
+// Check platform
+window.addEventListener('load', function checkPlatform () {
+  // Check compatibility
+  if (window.OpusMediaRecorder === undefined) {
+    console.error('No OpusMediaRecorder found');
   } else {
+    // Check available content types
     let contentTypes = [
       'audio/wave',
       'audio/wav',
@@ -126,6 +130,25 @@ document.addEventListener('DOMContentLoaded', _ => {
           ? 'supported' : 'NOT supported'));
     });
   }
+
+  // Check default MIME audio format for the client's platform
+  // To do this, create captureStream() polyfill.
+  function getStream (mediaElement) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const context = new AudioContext();
+    const source = context.createMediaElementSource(mediaElement);
+    const destination = context.createMediaStreamDestination();
+
+    source.connect(destination);
+    source.connect(context.destination);
+
+    return destination.stream;
+  }
+
+  // When creating MediaRecorder object without mimeType option, the API will
+  //  decide the default MIME Type depending on the browser running.
+  let tmpRec = new MediaRecorder(getStream(new Audio('sample.mp3')), {}, workerOptions);
+  defaultMime.innerHTML = `default: ${tmpRec.mimeType} (Browser dependant)`;
 }, false);
 
 // Update state of buttons when any buttons clicked
@@ -166,6 +189,52 @@ function updateButtonState () {
   }
 }
 
+
+/*******************************************************************************
+ * Debug helpers
+ *    This section is only for debugging purpose, library users don't need them.
+ ******************************************************************************/
+// Monkey-patching console.log for debugging.
+document.addEventListener('DOMContentLoaded', (e) => {
+  let lineCount = 0;
+
+  function overrideConsole (oldFunction, divLog) {
+    return function (text) {
+      oldFunction(text);
+      lineCount += 1;
+      if (lineCount > 100) {
+        let str = divLog.innerHTML;
+        divLog.innerHTML = str.substring(str.indexOf('<br>') + '<br>'.length);
+      }
+      divLog.innerHTML += text + '<br>';
+    };
+  };
+
+  console.log = overrideConsole(console.log.bind(console), document.getElementById('errorLog'));
+  console.error = overrideConsole(console.error.bind(console), document.getElementById('errorLog'));
+  console.debug = overrideConsole(console.debug.bind(console), document.getElementById('errorLog'));
+  console.info = overrideConsole(console.info.bind(console), document.getElementById('errorLog'));
+}, false);
+
+// Print any error
+window.onerror = (msg, url, lineNo, columnNo, error) => {
+  let substring = 'script error';
+  if (msg.toLowerCase().indexOf(substring) > -1) {
+    console.log('Script Error: See Browser Console for Detail');
+  } else {
+    let message = [
+      'Message: ' + msg,
+      'URL: ' + url,
+      'Line: ' + lineNo,
+      'Column: ' + columnNo,
+      'Error object: ' + JSON.stringify(error)
+    ].join(' - ');
+
+    console.log(message);
+  }
+  return false;
+};
+
 // print stream information (for debugging)
 function printStreamInfo (stream) {
   for (const track of stream.getAudioTracks()) {
@@ -184,3 +253,6 @@ function printStreamInfo (stream) {
     }
   }
 }
+/*******************************************************************************
+ * End of debug helpers
+ ******************************************************************************/
