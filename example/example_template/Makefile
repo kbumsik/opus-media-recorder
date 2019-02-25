@@ -7,15 +7,12 @@ TARGETS = \
 	$(OUTPUT_DIR)/main.css \
 	$(OUTPUT_DIR)/octocat.css
 
-all: node_modules $(TARGETS)
+all: $(TARGETS)
 
-$(OUTPUT_DIR)/index.html $(OUTPUT_DIR)/example.js: index.html example.js
-	npm run build
+$(OUTPUT_DIR)/index.html $(OUTPUT_DIR)/example.js: index.template.html example.template.js
+	node generate_examples_from_template.js
 
 $(OUTPUT_DIR)/%.css: %.css
 	cp $< $@
-
-node_modules:
-	npm install
 
 .PHONY: all $(OUTPUT_DIR)/index.html

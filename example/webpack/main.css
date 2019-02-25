@@ -1,0 +1,89 @@
+
+html,
+body {
+  text-align: center;
+  max-width: 600px;
+  margin: auto;
+  font-family: sans-serif;
+  background-color: #f0f2f5 !important;
+}
+
+.card {
+  margin: 10px;
+  padding: 10px;
+  background-color: #ffffff;
+}
+
+.card header h3 {
+  text-align: left;
+  margin: 6px 8px;
+}
+
+.card div {
+  margin: 2px;
+}
+
+.description,
+.note {
+  text-align: left;
+  margin: 12px;
+}
+
+.note {
+  font-size: small;
+}
+
+.controller {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 40px;
+  z-index: 10;
+}
+
+.mime-select {
+  width: 280px;
+}
+
+.timeslice-input {
+  width: 100px;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+}
+
+.github-corner {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0px;
+  z-index: 10;
+  background-color: #151513;
+  color: #ffffff;
+  text-decoration: none;
+  display: flex;
+  align-content: flex-end;
+  justify-content: flex-end;
+  flex-direction: row;
+  white-space: nowrap;
+  overflow: hidden;
+  height: 40px;
+}
+
+.github-corner span {
+  margin-top: 10px;
+}
+
+.github-corner :last-child {
+  margin-right: 3%;
+}
+
+.log {
+  font-family: monospace;
+  text-align: left;
+  white-space: pre;
+  overflow-x: auto;
+  font-size: 12px;
+}
