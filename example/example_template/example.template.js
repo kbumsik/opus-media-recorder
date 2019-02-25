@@ -105,7 +105,7 @@ function initButtons () {
 // Check platform
 window.addEventListener('load', function checkPlatform () {
   // Check compatibility
-  if (window.OpusMediaRecorder === undefined) {
+  if (OpusMediaRecorder === undefined) {
     console.error('No OpusMediaRecorder found');
   } else {
     // Check available content types
@@ -140,7 +140,9 @@ window.addEventListener('load', function checkPlatform () {
 
   // When creating MediaRecorder object without mimeType option, the API will
   //  decide the default MIME Type depending on the browser running.
-  let tmpRec = new MediaRecorder(getStream(new Audio('sample.mp3')), {}, workerOptions);
+  let tmpRec = new MediaRecorder(
+    getStream(new Audio('https://kbumsik.io/opus-media-recorder/sample.mp3')),
+    {}, workerOptions);
   defaultMime.innerHTML = `default: ${tmpRec.mimeType} (Browser dependant)`;
 }, false);
 

@@ -18,6 +18,7 @@ commonFunctions.js
 example/*/app.js
 example/*/*.worker.js
 example/*/*.wasm
+example/*/bundle.js
 
 
 # WebIDL parsing files
