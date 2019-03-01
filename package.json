@@ -71,7 +71,6 @@
     "magic-string": "^0.25.2",
     "webpack": "^4.28.4",
     "webpack-cli": "^3.2.1",
-    "webpack-dev-server": "^3.1.14",
-    "wrapper-webpack-plugin": "^2.1.0"
+    "webpack-dev-server": "^3.1.14"
   }
 }
