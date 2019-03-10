@@ -179,8 +179,6 @@ $(BUILD_DIR)/%.umd.js: $(BUILD_DIR)/%.js $(BUILD_DIR)/commonFunctions.js
 $(BUILD_DIR)/%Worker.umd.js: $(BUILD_DIR)/%Worker.js $(BUILD_DIR)/commonFunctions.js
 	npm run webpack -- --config webpack.worker.config.js \
 						$(NPM_FLAGS) \
-						--output-library $(basename $(notdir $<)) \
-						--output-library-target umd \
 						$< \
 						-o $@
 

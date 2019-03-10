@@ -92,4 +92,4 @@ if (typeof WorkerGlobalScope !== 'undefined' &&
  * TODO: This line causes undefined symbol: __webpack_require__
  * So comment out until figuring out the solution
  */
-// module.exports = initWorker;
+module.exports = initWorker;
