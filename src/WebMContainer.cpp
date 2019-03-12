@@ -88,11 +88,11 @@ void Container::addTrack(void)
   audio_track->set_bit_depth(32u);
   audio_track->set_codec_id(mkvmuxer::Tracks::kOpusCodecId);
 
-  uint8_t opus_header[OpusCommentHeaderType::SIZE];
+  uint8_t opus_header[OpusIdHeaderType::SIZE];
   writeOpusIdHeader(opus_header);
 
   // Init failed
-  assert(audio_track->SetCodecPrivate(opus_header, OpusCommentHeaderType::SIZE));
+  assert(audio_track->SetCodecPrivate(opus_header, OpusIdHeaderType::SIZE));
 
   // Segment's timestamps should be in milliseconds
   // See http://www.webmproject.org/docs/container/#muxer-guidelines
