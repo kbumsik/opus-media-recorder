@@ -2,8 +2,8 @@
 
 // Non-standard options
 const workerOptions = {
-  OggOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@0.7.16/OggOpusEncoder.wasm',
-  WebMOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@0.7.16/WebMOpusEncoder.wasm'
+  OggOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@0.7.17/OggOpusEncoder.wasm',
+  WebMOpusEncoderWasmPath: 'https://cdn.jsdelivr.net/npm/opus-media-recorder@0.7.17/WebMOpusEncoder.wasm'
 };
 
 // Polyfill MediaRecorder
