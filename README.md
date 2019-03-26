@@ -2,9 +2,9 @@
 
 [Try it!](https://kbumsik.io/opus-media-recorder/)
 
-`opus-media-recorder` is a [MediaRecorder API](https://w3c.github.io/mediacapture-record/#mediarecorder-api) polyfill written in ES6 and WebAssembly. It aims a cross-browser Opus codec support with various audio formats such as Ogg and WebM. `opus-media-recorder` can be used as a ployfill, or it can replace the built-in MediaRecorder since `opus-media-recorder` supports more MIME types.
+`opus-media-recorder` is a [MediaRecorder API](https://w3c.github.io/mediacapture-record/#mediarecorder-api) polyfill written in ES6 and WebAssembly. It aims for cross-browser Opus codec support with various audio formats such as Ogg and WebM. `opus-media-recorder` can be used as a polyfill, or it can replace the built-in MediaRecorder since `opus-media-recorder` supports more MIME types.
 
-`opus-media-recorder` uses WebAssembly compiled from popular libraries (e.g libopus, libogg, libwebm, and speexdsp) to ensure performance and standards-compliance.
+`opus-media-recorder` uses WebAssembly compiled from popular libraries (e.g libopus, libogg, libwebm, and speexdsp) to ensure good performance and standards-compliance.
 
 ## Why opus-media-recorder?
 
@@ -23,7 +23,7 @@ Currently the MediaRecorder API suffers from the two problems:
 
 `opus-media-recorder` tackles these problems by supporting all major modern browsers (Chrome, Firefox, iOS, and Edge) and by providing various formats.
 
-By taking advantages of WebAssembly and Web Workers, `opus-media-recorder` tries to have minimum performace panalties of running encoders on a browser.
+By taking advantages of WebAssembly and Web Workers, `opus-media-recorder` tries to have minimum performace penalties of running encoders in a browser.
 
 ## How to use
 
