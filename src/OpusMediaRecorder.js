@@ -131,22 +131,6 @@ class OpusMediaRecorder extends EventTarget {
                             ? encoderWorkerFactory
                             : _ => new Worker(workerDir);
     this._spawnWorker();
-
-    // Get channel count and sampling rate
-    // channelCount: https://www.w3.org/TR/mediacapture-streams/#media-track-settings
-    // sampleRate: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/sampleRate
-    this.context = new AudioContext();
-    let tracks = this.stream.getAudioTracks();
-    if (!tracks[0]) {
-      throw new Error('DOMException: UnkownError, media track not found.');
-    }
-    this.channelCount = tracks[0].getSettings().channelCount || 1;
-    this.sampleRate = this.context.sampleRate;
-
-    /** @type {MediaStreamAudioSourceNode} */
-    this.source = this.context.createMediaStreamSource(this.stream);
-    /** @type {ScriptProcessorNode} */
-    this.processor = this.context.createScriptProcessor(BUFFER_SIZE, this.channelCount, this.channelCount);
   }
 
   /**
@@ -382,6 +366,23 @@ class OpusMediaRecorder extends EventTarget {
       this._spawnWorker();
     }
 
+    // Get channel count and sampling rate
+    // channelCount: https://www.w3.org/TR/mediacapture-streams/#media-track-settings
+    // sampleRate: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/sampleRate
+    this.context = new AudioContext();
+    let tracks = this.stream.getAudioTracks();
+    if (!tracks[0]) {
+      throw new Error('DOMException: UnkownError, media track not found.');
+    }
+    this.channelCount = tracks[0].getSettings().channelCount || 1;
+    this.sampleRate = this.context.sampleRate;
+
+    /** @type {MediaStreamAudioSourceNode} */
+    this.source = this.context.createMediaStreamSource(this.stream);
+    /** @type {ScriptProcessorNode} */
+    this.processor = this.context.createScriptProcessor(BUFFER_SIZE, this.channelCount, this.channelCount);
+
+    // Start recording
     this._state = 'recording';
     this._enableAudioProcessCallback(timeslice);
 
@@ -407,6 +408,7 @@ class OpusMediaRecorder extends EventTarget {
     // Stop stream first
     this.source.disconnect();
     this.processor.disconnect();
+    this.context.close();
 
     // Stop event will be triggered at _onmessageFromWorker(),
     this._postMessageToWorker('done');
