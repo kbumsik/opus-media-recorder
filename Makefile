@@ -5,10 +5,14 @@
 
 # Change the port you like. You can run the dev server by using "make run"
 DEV_SERVER_PORT := 9000
+VERSION = $(shell echo "console.log(require('./package.json').version)" | node)
+EMCC_VERSION_REQUIRED = 1.38.24
+
 # Used by build-docs target
 ifdef PRODUCTION
-	export BASE_URL := https://cdn.jsdelivr.net/npm/opus-media-recorder@latest
+	export BASE_URL := https://cdn.jsdelivr.net/npm/opus-media-recorder@$(VERSION)
 else
+	# export BASE_URL := https://cdn.jsdelivr.net/npm/opus-media-recorder@latest
 	export BASE_URL := https://localhost:$(DEV_SERVER_PORT)
 endif
 
@@ -58,7 +62,7 @@ endif
 # Reference: https://github.com/kripken/emscripten/blob/master/src/settings.js
 
 # Emscripten compiler (emcc) options
-export EMCC_DEBUG=1
+#export EMCC_DEBUG=1
 EMCC_OPTS = -std=c++11 \
 			-fno-exceptions \
 			-Oz \
@@ -198,9 +202,6 @@ $(DIST_DIR)/%.bin: $(BUILD_DIR)/%.wasm
 
 .PHONY : all check_emcc serve build-docs clean-lib clean-js clean
 
-ifndef EMSCRIPTEN
-  $(error EMSCRIPTEN is undefined. Enable Escripten SDK.)
-endif
 
 cc_version = $(shell $(1) --version | head -n1 | cut -d" " -f5)
 
@@ -214,9 +215,10 @@ define check_version
 endef
 
 check_emcc:
+	@echo Building opus-media-recorder@$(VERSION)
 	@which emcc > /dev/null
-	@echo Building with emcc version: $(call cc_version, emcc)
-	$(call check_version, $(call cc_version, emcc), 1.38.24, 'emcc(emscripten) version must be 1.38.25 or higher')
+	@echo \temcc version: $(call cc_version, emcc)
+	$(call check_version, $(call cc_version, emcc), $(EMCC_VERSION_REQUIRED), 'emcc(emscripten) version must be $(EMCC_VERSION_REQUIRED) or higher')
 
 $(BUILD_DIR) $(LIB_BUILD_DIR):
 	mkdir -p $@
