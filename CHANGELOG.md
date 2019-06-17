@@ -17,5 +17,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#16]: https://github.com/kbumsik/opus-media-recorder/issues/16
 
 [Unreleased]: https://github.com/kbumsik/opus-media-recorder/compare/0.7.18...HEAD
-[0.7.18]: https://github.com/kbumsik/opus-media-recorder/releases/tag/0.7.18
+[0.7.18]: https://github.com/kbumsik/opus-media-recorder/compare/0.7.17...0.7.18
 [0.7.17]: https://github.com/kbumsik/opus-media-recorder/releases/tag/0.7.17
