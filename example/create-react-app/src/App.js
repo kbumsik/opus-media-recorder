@@ -1,26 +1,39 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import React, { Component } from 'react';
+import OpusMediaRecorderView from './OpusMediaRecorderView'
 
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+class App extends Component {
+  constructor(props) {
+    super(props);
+    const data = [];
+    this.state = { data: data, blob: new Blob(data)};
+  }
+
+  render() {
+    return (
+      <div className="App">
+        <OpusMediaRecorderView
+          onDataAvailable={(e) => {
+            const data = [...this.state.data, e.data];
+            this.setState({
+              data: data,
+              blob: new Blob(data)
+            })
+          }}
+          render={({ state, start, stop, pause, resume }) => (
+            <div>
+              <p>{state}</p>
+              <button onClick={start}>Start Recording</button>
+              <button onClick={stop}>Stop Recording</button>
+              <audio
+                src={this.state.data.length ? URL.createObjectURL(this.state.blob) : ''}
+                controls
+              />
+            </div>
+          )}
+        />
+      </div>
+    )
+  }
 }
 
 export default App;
