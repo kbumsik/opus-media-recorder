@@ -5,6 +5,7 @@
 
 # Change the port you like. You can run the dev server by using "make run"
 DEV_SERVER_PORT := 9000
+DEV_SERVER_URL := https://localhost
 VERSION := $(shell echo "console.log(require('./package.json').version)" | node)
 EMSCRIPTEN := $(dir $(shell which emcc))
 EMCC_VERSION_REQUIRED := 1.38.34
@@ -14,7 +15,7 @@ ifdef PRODUCTION
 	export BASE_URL := https://cdn.jsdelivr.net/npm/opus-media-recorder@$(VERSION)
 else
 	# export BASE_URL := https://cdn.jsdelivr.net/npm/opus-media-recorder@latest
-	export BASE_URL := https://localhost:$(DEV_SERVER_PORT)
+	export BASE_URL := $(DEV_SERVER_URL):$(DEV_SERVER_PORT)
 endif
 
 # Path Settings
@@ -73,7 +74,7 @@ EMCC_OPTS = -std=c++11 \
 			-s MODULARIZE=1 \
 			-s FILESYSTEM=0 \
 			-s MALLOC="emmalloc" \
-			--source-map-base http://localhost:$(DEV_SERVER_PORT)/ \
+			--source-map-base $(DEV_SERVER_URL):$(DEV_SERVER_PORT)/ \
 			-s ERROR_ON_UNDEFINED_SYMBOLS=0
 			# -s EXPORT_ES6=1 -- I'm not using ES6 import yet.
 			# -s ENVIRONMENT='worker' -- Enabling it will delete node.js

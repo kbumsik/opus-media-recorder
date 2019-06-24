@@ -64,7 +64,8 @@ const options = { mimeType: 'audio/ogg' }
 // Web worker and .wasm configuration. Note: This is NOT a part of W3C standard.
 const workerOptions = {
   encoderWorkerFactory: function () {
-    return new Worker('.../path/to/opus-media-recorder/encoderWorker.js')
+    // UMD should be used if you don't use a web worker bundler for this.
+    return new Worker('.../path/to/opus-media-recorder/encoderWorker.umd.js')
   },
   OggOpusEncoderWasmPath: '.../path/to/opus-media-recorder/OggOpusEncoder.wasm',
   WebMOpusEncoderWasmPath: '.../path/to/opus-media-recorder/WebMOpusEncoder.wasm'
@@ -85,7 +86,7 @@ Bundler-specific examples:
 ```javascript
 import OpusMediaRecorder from 'opus-media-recorder';
 // Use worker-loader
-import Worker from 'worker-loader!opus-media-recorder/encoderWorker.js';
+import EncoderWorker from 'worker-loader!opus-media-recorder/encoderWorker.js';
 // You should use file-loader in webpack.config.js.
 // See webpack example link in the above section for more detail.
 import OggOpusWasm from 'opus-media-recorder/OggOpusEncoder.wasm';
@@ -93,7 +94,7 @@ import WebMOpusWasm from 'opus-media-recorder/WebMOpusEncoder.wasm';
 
 // Non-standard options
 const workerOptions = {
-  encoderWorkerFactory: _ => new Worker(),
+  encoderWorkerFactory: _ => new EncoderWorker(),
   OggOpusEncoderWasmPath: OggOpusWasm,
   WebMOpusEncoderWasmPath: WebMOpusWasm
 };
@@ -195,12 +196,12 @@ Browsers with issues:
 
 ## How to build
 
-1. To build from the source, you need [Emscripten](https://github.com/kripken/emscripten) version 1.38.25, [NPM](https://www.npmjs.com/), [npx](https://www.npmjs.com/package/npx), Python 2.7 or higher, and basic C program build systems such as [GNU Make](https://www.gnu.org/software/make/). Environment variable `$EMSCRIPEN` must be set in order to build.
+1. To build from the source, you need [Emscripten](https://github.com/kripken/emscripten), [yarn](https://yarnpkg.com), Python 2.7 or higher, and basic C program build systems such as [GNU Make](https://www.gnu.org/software/make/).
 
-2. `npm install` to install JavaScript dependencies.
+2. `yarn install` to install JavaScript dependencies.
 
-3. `npm run build` to build. `npm run build:production` to build files for distribution.
+3. `yarn run build` to build. `yarn run build:production` to build files for distribution.
 
-4. `npm run serve` to run a test web server locally. Default URL is `https://localhost:9000` (It has to be HTTPS). You might have to change the `src` path of `<script>` at the bottom of `docs/index.html` to test it correctly (I'm finding a way to automate this.)
+4. `yarn run serve` to run a test web server locally. Default URL is `https://localhost:9000` (It has to be HTTPS). You might have to change `DEV_SERVER_URL` and `DEV_SERVER_PORT` to change the address of the local test server.
 
-5. `npm run clean` to clean up build files.
+5. `yarn run clean` to clean up build files.
