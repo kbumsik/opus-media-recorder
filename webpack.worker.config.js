@@ -7,7 +7,12 @@ module.exports = {
       test: /\.js$/,
       header: `
 (function OpusMediaWorkerUMD(root, factory) {
-	if(typeof exports === 'object' && typeof module === 'object')
+  if (typeof WorkerGlobalScope !== 'undefined' &&
+    self instanceof WorkerGlobalScope) {
+    var initWorker = factory();
+    initWorker();
+  }
+	else if(typeof exports === 'object' && typeof module === 'object')
 		module.exports = factory();
 	else if(typeof define === 'function' && define.amd)
 		define([], factory);
