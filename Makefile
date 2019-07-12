@@ -8,7 +8,7 @@ DEV_SERVER_PORT := 9000
 DEV_SERVER_URL := https://localhost
 VERSION := $(shell echo "console.log(require('./package.json').version)" | node)
 EMSCRIPTEN := $(dir $(shell which emcc))
-EMCC_VERSION_REQUIRED := 1.38.34
+EMCC_VERSION_REQUIRED := 1.38.36
 
 # Used by build-docs target
 ifdef PRODUCTION
@@ -209,7 +209,7 @@ $(DIST_DIR)/%.bin: $(BUILD_DIR)/%.wasm
 cc_version = $(shell $(1) --version | head -n1 | cut -d" " -f5)
 
 define check_version
-	@if test "$$(printf '%s\n' "$(1)" "$(2)" | sort -V | head -2 | tail -1)" == "$(2)"; then \
+	@if test "$$(printf '%s\n' "$(1)" "$(2)" | sort -V | tail -1)" = "$(1)"; then \
 		exit 0; \
 	else \
 		echo $(3); \
@@ -220,7 +220,7 @@ endef
 check_emcc:
 	@echo Building opus-media-recorder@$(VERSION)
 	@which emcc > /dev/null
-	@echo \temcc version: $(call cc_version, emcc)
+	@echo emcc version: $(call cc_version, emcc)
 	$(call check_version, $(call cc_version, emcc), $(EMCC_VERSION_REQUIRED), 'emcc(emscripten) version must be $(EMCC_VERSION_REQUIRED) or higher')
 
 $(BUILD_DIR) $(LIB_BUILD_DIR):

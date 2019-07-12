@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - README.md: Fixed typo. Add Table of Contents and Changelog section.
+- Makefile: Fixed `emcc` version checking not working correctly with shell in older standard [#20]. Thanks [@rowntreerob]!
+
+[@rowntreerob]: https://github.com/rowntreerob
+[#20]: https://github.com/kbumsik/opus-media-recorder/issues/20
 
 ## [0.7.19]
 ### Fixed
