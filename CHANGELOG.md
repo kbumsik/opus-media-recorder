@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - README.md: Fixed typo. Add Table of Contents and Changelog section.
+- README.md.: Added create-react-app and JSFiddle examples.
 - Makefile: Fixed `emcc` version checking not working correctly with shell in older standard [#20]. Thanks [@rowntreerob]!
 
 [@rowntreerob]: https://github.com/rowntreerob

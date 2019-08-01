@@ -1,25 +1,27 @@
 # opus-media-recorder
 
-[Try it!](https://kbumsik.io/opus-media-recorder/)
+* [Try it!](https://kbumsik.io/opus-media-recorder/)
+* [JS Fiddle example](https://jsfiddle.net/kbumsik/v3wpnxao/)
 
 `opus-media-recorder` is a [MediaRecorder API](https://w3c.github.io/mediacapture-record/#mediarecorder-api) polyfill written in ES6 and WebAssembly. It aims for cross-browser Opus codec support with various audio formats such as Ogg and WebM. `opus-media-recorder` can be used as a polyfill, or it can replace the built-in MediaRecorder since `opus-media-recorder` supports more MIME types.
 
 `opus-media-recorder` uses WebAssembly compiled from popular libraries (e.g libopus, libogg, libwebm, and speexdsp) to ensure good performance and standards-compliance.
 
-- [Why opus-media-recorder?](#Why-opus-media-recorder)
-- [How to use](#How-to-use)
-  - [Thing to know](#Thing-to-know)
-  - [JavaScript](#JavaScript)
-    - [Installation](#Installation)
-    - [Working with a bundler](#Working-with-a-bundler)
-    - [Simple JavaScript example (webpack)](#Simple-JavaScript-example-webpack)
-  - [HTML `<script>` tag](#HTML-script-tag)
-  - [Use opus-media-recorder only when a browser doesn't support it](#Use-opus-media-recorder-only-when-a-browser-doesnt-support-it)
-- [Browser support](#Browser-support)
-- [MIME Type support](#MIME-Type-support)
-- [Limitations](#Limitations)
-- [How to build](#How-to-build)
-- [Changelog](#Changelog)
+- [Why opus-media-recorder?](#why-opus-media-recorder)
+- [How to use](#how-to-use)
+  - [Thing to know](#thing-to-know)
+  - [JavaScript](#javascript)
+    - [Examples](#examples)
+    - [Installation](#installation)
+    - [Working with a bundler](#working-with-a-bundler)
+    - [Simple JavaScript example (webpack)](#simple-javascript-example-webpack)
+  - [HTML `<script>` tag](#html-script-tag)
+  - [Use opus-media-recorder only when a browser doesn't support it](#use-opus-media-recorder-only-when-a-browser-doesnt-support-it)
+- [Browser support](#browser-support)
+- [MIME Type support](#mime-type-support)
+- [Limitations](#limitations)
+- [How to build](#how-to-build)
+- [Changelog](#changelog)
 
 ## Why opus-media-recorder?
 
@@ -61,6 +63,14 @@ opus-media-recorder is compatible with the [Mediastream Recording API](https://d
 ### JavaScript
 
 For standard usages of `MediaRecorder`, see the [MDN reference](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) and other online resources. Our [testing website](docs) and [example section](example) may be useful as well.
+
+#### Examples
+
+* [Webpack](example/webpack)
+* [create-react-app](example/create-react-app)
+* [Rollup](example/rollup)
+* [Browserify](example/browserify)
+
 #### Installation
 
 ```bash
@@ -88,12 +98,6 @@ const workerOptions = {
 window.MediaRecorder = OpusMediaRecorder;
 recorder = new MediaRecorder(stream, options, workerOptions);
 ```
-
-Bundler-specific examples:
-
-* [Webpack](example/webpack)
-* [Rollup](example/rollup)
-* [Browserify](example/browserify)
 
 #### Simple JavaScript example (webpack)
 
