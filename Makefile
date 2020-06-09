@@ -8,7 +8,7 @@ DEV_SERVER_PORT := 9000
 DEV_SERVER_URL := https://localhost
 VERSION := $(shell echo "console.log(require('./package.json').version)" | node)
 EMSCRIPTEN := $(dir $(shell which emcc))
-EMCC_VERSION_REQUIRED := 1.38.36
+EMCC_VERSION_REQUIRED := 1.39.10
 
 # Used by build-docs target
 ifdef PRODUCTION

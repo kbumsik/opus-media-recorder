@@ -63,7 +63,7 @@ $(SPEEX_OBJ): $(SPEEX_OBJ_LIB) $(LIB_BUILD_DIR)
 
 # libwebm
 $(WEBM_OBJ_LIB): $(WEBM_DIR)
-	cd $< && emconfigure cmake . \
+	cd $< && emcmake cmake . \
 							-DCMAKE_BUILD_TYPE=release \
 							-DCMAKE_CXX_FLAGS="-MMD -MP"
 	emmake make -C $<
